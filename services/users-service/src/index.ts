@@ -1,0 +1,42 @@
+import { ApolloServer } from "@apollo/server";
+import { startStandaloneServer } from "@apollo/server/standalone";
+
+import { UsersAPI } from "./datasources/users-api";
+import { resolvers } from "./resolvers";
+import { readFileSync } from "fs";
+
+import path from "path";
+import { gql } from "graphql-tag";
+import { fileURLToPath } from "url";
+import { buildSubgraphSchema } from "@apollo/subgraph";
+
+const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
+const __dirname = path.dirname(__filename); // get the name of the directory
+
+const typeDefs = gql(
+  readFileSync(path.resolve(__dirname, "./schema.graphql"), {
+    encoding: "utf-8",
+  })
+);
+
+const port = 4001;
+const subgraphName = "users";
+
+async function startApolloServer() {
+  const server = new ApolloServer({
+    schema: buildSubgraphSchema({ typeDefs, resolvers }),
+  });
+  const { url } = await startStandaloneServer(server, {
+    context: async () => {
+      return {
+        dataSources: {
+          usersAPI: new UsersAPI(),
+        },
+      };
+    },
+    listen: { port },
+  });
+  console.log(`🚀 Subgraph ${subgraphName} at ${url}`);
+}
+
+startApolloServer();
