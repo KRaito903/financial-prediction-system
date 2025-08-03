@@ -7,14 +7,10 @@ import { readFileSync } from "fs";
 
 import path from "path";
 import { gql } from "graphql-tag";
-import { fileURLToPath } from "url";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 
-const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
-const __dirname = path.dirname(__filename); // get the name of the directory
-
 const typeDefs = gql(
-  readFileSync(path.resolve(__dirname, "./schema.graphql"), {
+  readFileSync(path.resolve(__dirname, "./users-schema.graphql"), {
     encoding: "utf-8",
   })
 );
