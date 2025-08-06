@@ -1,0 +1,31 @@
+services:
+  users-service:
+    build:
+      context: ./services/users-service
+      dockerfile: Dockerfile
+      target: dev
+    container_name: users-service
+    ports:
+      - "4001:4001"
+    environment:
+      - NODE_ENV=development
+    develop:
+      watch:
+        - path: ./services/users-service/package.json
+          action: rebuild
+
+        - path: ./services/users-service/
+          action: sync
+          target: /usr/src/app
+
+  apollo-service-router:
+    depends_on:
+      - users-service
+    image: ghcr.io/apollographql/router:v2.5.0
+    container_name: apollo-service-router
+    ports:
+      - "4000:4000"
+      - "8088:8088"
+    environment:
+      - APOLLO_GRAPH_REF
+      - APOLLO_KEY
