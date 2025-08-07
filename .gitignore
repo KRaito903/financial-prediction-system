@@ -1,7 +1,18 @@
+# Dependencies
 node_modules/
-dist/
-.env
-.DS_Store
 npm-debug.log
 yarn-error.log
+
+# Build output
+dist/
+
+# Environment variables
+.env
+services/router/.env
+
+# OS files
+.DS_Store
+
+# Apollo Router
+supergraph.graphql
 router/

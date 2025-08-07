@@ -1,31 +1,69 @@
+
 services:
+  # Users Service - Subgraph
   users-service:
     build:
-      context: ./services/users-service
-      dockerfile: Dockerfile
-      target: dev
+      context: ./services
+      dockerfile: Dockerfile.users
     container_name: users-service
     ports:
       - "4001:4001"
     environment:
       - NODE_ENV=development
-    develop:
-      watch:
-        - path: ./services/users-service/package.json
-          action: rebuild
+      - PORT=4001
+    networks:
+      - apollo-network
 
-        - path: ./services/users-service/
-          action: sync
-          target: /usr/src/app
-
-  apollo-service-router:
+  # Rover Setup - Authentication & Schema Publishing
+  rover-setup:
+    image: node:18-bullseye
+    container_name: rover-setup
+    env_file:
+      - ./.env
+    volumes:
+      - ./services:/app
+      - rover-data:/root/.config/rover
+    networks:
+      - apollo-network
     depends_on:
       - users-service
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/schema_published"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: >
+      sh -c "
+        echo 'Installing Rover CLI...' && 
+        npm install -g @apollo/rover && 
+        echo 'Waiting for users service...' && 
+        sleep 5 && 
+        echo 'Publishing subgraph schema...' && 
+        rover subgraph publish --name users --schema /app/users-service/src/users-schema.graphql --routing-url  http://users-service:4001/ $$APOLLO_GRAPH_REF && 
+        echo 'Schema published successfully!' &&
+        touch /tmp/schema_published &&
+        tail -f /dev/null
+      "
+
+  # Apollo Router - Federation Gateway
+  apollo-router:
     image: ghcr.io/apollographql/router:v2.5.0
-    container_name: apollo-service-router
+    container_name: apollo-router
+    depends_on:
+      rover-setup:
+        condition: service_healthy
     ports:
       - "4000:4000"
-      - "8088:8088"
     environment:
       - APOLLO_GRAPH_REF
       - APOLLO_KEY
+    networks:
+      - apollo-network
+
+
+volumes:
+  rover-data:
+
+networks:
+  apollo-network:
+    driver: bridge

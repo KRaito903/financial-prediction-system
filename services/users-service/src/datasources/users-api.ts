@@ -4,4 +4,8 @@ export class UsersAPI {
   listUsers() {
     return users;
   }
+
+  listUsersByName(name: string) {
+    return users.filter(user => user.name.toLowerCase().includes(name.toLowerCase()));
+  }
 }

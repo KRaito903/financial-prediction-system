@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Copy package files
+COPY users-service/package*.json ./users-service/
+
+# Install dependencies exactly like local
+WORKDIR /app/users-service
+RUN npm install
+
+# Copy the rest of the service files
+COPY users-service/ ./
+
+# Generate types first (như local)
+RUN npm run generate
+
+# Start service (như local)
+CMD ["npm", "start"]

@@ -19,6 +19,12 @@ export type Scalars = {
 export type Query = {
   __typename?: 'Query';
   listUsers: Array<User>;
+  listUsersByName: Array<User>;
+};
+
+
+export type QueryListUsersByNameArgs = {
+  name?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type User = {
@@ -117,6 +123,7 @@ export type ResolversParentTypes = {
 
 export type QueryResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   listUsers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  listUsersByName?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType, Partial<QueryListUsersByNameArgs>>;
 };
 
 export type UserResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
