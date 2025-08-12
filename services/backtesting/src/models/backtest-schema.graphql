@@ -1,0 +1,116 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.9", import: ["@key"])
+
+type User @key(fields: "id") {
+  id: ID!
+  name: String!
+  email: String!
+}
+
+# OHLCV data point representing a single candlestick
+type OHLCVData {
+  date: String!
+  open: Float!
+  high: Float!
+  low: Float!
+  close: Float!
+  volume: Float
+}
+
+# Input for a single OHLCV data point
+input OHLCVDataInput {
+  date: String!
+  open: Float!
+  high: Float!
+  low: Float!
+  close: Float!
+  volume: Float
+}
+
+# Strategy types
+enum StrategyType {
+  MA_CROSSOVER
+  SIMPLE
+}
+
+# Input for MA Crossover strategy parameters
+input MACrossoverParams {
+  fastMAPeriod: Int!
+  slowMAPeriod: Int!
+}
+
+# Input type for vectorized backtest
+input VectorizedBacktestInput {
+  data: [OHLCVDataInput!]! # list of candlesticks
+  strategyType: StrategyType! = MA_CROSSOVER # default to MA_CROSSOVER
+  maCrossoverParams: MACrossoverParams # required if strategyType is MA_CROSSOVER
+  period: String = "1D" # default to daily data
+  initCash: Float = 10000
+  fees: Float = 0.001
+  slippage: Float = 0.001
+  fixedSize: Int
+  percentSize: Float
+  useFallback: Boolean = true
+}
+
+type BacktestResult {
+  id: ID!
+  userId: ID!
+  createdAt: String!
+  strategy: String!
+  performance: Float!
+  metrics: BacktestMetrics
+  dataPoints: [OHLCVData]
+  trades: [Trade]
+}
+
+type Trade {
+  date: String!
+  type: String!  # BUY or SELL
+  price: Float!
+  size: Float!
+  value: Float!
+}
+
+type BacktestMetrics {
+  sharpeRatio: Float
+  maxDrawdown: Float
+  totalReturn: Float
+  winRate: Float
+  totalTrades: Int
+  initialValue: Float
+  finalValue: Float
+}
+
+type VectorizedPortfolioValue {
+  date: String!
+  value: Float!
+}
+
+type VectorizedBacktestResult {
+  id: ID!
+  userId: ID!
+  createdAt: String!
+  strategy: String!
+  metrics: BacktestMetrics
+  equityCurve: [EquityPoint]
+  vectorizedPortfolioValues: [VectorizedPortfolioValue!]!
+}
+
+type EquityPoint {
+  date: String!
+  value: Float!
+}
+
+type Query {
+  listUsers: [User!]!
+  getUserBacktests(userId: ID!): [BacktestResult!]
+  getBacktestById(id: ID!): BacktestResult
+}
+
+type Mutation {
+  createBacktest(userId: ID!, strategy: String!): BacktestResult
+  deleteBacktest(id: ID!): Boolean
+  # New mutation for vectorized backtesting
+  runVectorizedBacktest(userId: ID!, input: VectorizedBacktestInput!): VectorizedBacktestResult
+}

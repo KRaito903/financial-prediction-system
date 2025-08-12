@@ -136,6 +136,12 @@ class VectorizedBacktestResult(BacktestResult):
     def get_portfolio(self) -> vbt.Portfolio:
         """Return the raw portfolio object for custom analysis."""
         return self.portfolio
+    
+    def get_portfolio_values(self) -> pd.DataFrame:
+        """Return the portfolio values as a DataFrame."""
+        if(self.portfolio.value() is None):
+            return pd.DataFrame(columns=['date', 'value'])
+        return self.portfolio.value().to_frame(name='value').reset_index().rename(columns={'index': 'date'})
 
 
 class EventDrivenBacktestResult(BacktestResult):

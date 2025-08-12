@@ -40,6 +40,11 @@ event_driven_service = BacktestServiceFactory.create_service("event_driven")
 vectorized_result = vectorized_service.run_backtest(**backtest_params)
 event_driven_result = event_driven_service.run_backtest(**backtest_params)
 
+print("Backtests completed successfully.")
+portfolio = vectorized_result.get_portfolio()
+portfolio_value = portfolio.value()
+print("Vectorized Backtest Result:", portfolio_value)
+
 # Display results
 print("\n" + "="*50)
 print("VECTORIZED BACKTEST RESULTS")
