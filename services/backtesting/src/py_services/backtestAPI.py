@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 # Use relative import for files in the same directory
@@ -53,11 +53,17 @@ async def run_vectorized_backtest(input: BacktestVectorizedInput):
     }
     
     # Run the backtest
-    result: VectorizedBacktestResult = service.run_backtest(**backtest_params)
+    try:
+        result: VectorizedBacktestResult = service.run_backtest(**backtest_params)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # Return the result as a dictionary
-    result_json = result.get_portfolio_values().to_dict(orient='records')
-    return json.dumps(result_json, indent=2)
+    # Better format for GraphQL consumption - structured response with metadata
+    return {
+        "status": "success",
+        "data": result.get_portfolio_values().to_dict(orient='records'),
+        "metrics": result.get_stats()  # Include performance metrics
+    }
   
 @app.get("/health")
 async def health_check():
@@ -66,5 +72,5 @@ async def health_check():
   
     
 if __name__ == "__main__":
-    uvicorn.run(app, host="1127.0.0.1", port=5050)
+    uvicorn.run(app, host="127.0.0.1", port=5050)
 # To run the FastAPI server, use the command:

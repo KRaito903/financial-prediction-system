@@ -1,0 +1,74 @@
+---
+config:
+  theme: redux-dark
+---
+graph TD
+    Client([Client Application]) -->|API Requests| APIGateway
+    
+    subgraph "API Gateway Layer"
+        APIGateway([API Gateway])
+        APIGateway -->|REST| FastAPI
+        APIGateway -->|GraphQL| GraphQLEndpoint
+    end
+    
+    subgraph "API Layer"
+        FastAPI([FastAPI])
+        GraphQLEndpoint([GraphQL Endpoint])
+        StrawberrySchema([Strawberry Schema])
+        
+        FastAPI -->|uses| InputModel[Pydantic Models]
+        FastAPI -->|exposes| RestEndpoints["REST Endpoints"]
+        GraphQLEndpoint -->|processes with| StrawberrySchema
+        StrawberrySchema -->|defines| GraphQLTypes["GraphQL Types"]
+        StrawberrySchema -->|defines| GraphQLQueries["GraphQL Queries"]
+        StrawberrySchema -->|defines| GraphQLMutations["GraphQL Mutations"]
+        
+        StrawberrySchema -->|forwards processed request to| FastAPI
+    end
+    
+    FastAPI --> Factory
+    
+    subgraph "Service Layer"
+        Factory[BacktestServiceFactory]
+        DataPreprocessor[DataPreprocessor]
+        Factory -->|creates| VectorService[VectorizedBacktestService]
+        Factory -->|creates| EventService[EventDrivenBacktestService]
+        VectorService & EventService -->|uses| DataPreprocessor
+    end
+    
+    subgraph "Strategy Layer"
+        VectorService & EventService -->|uses| TradingStrategies[TradingStrategy]
+        TradingStrategies -->|implements| CrossoverStrategy[CrossoverMAStrategy]
+        TradingStrategies -->|implements| SimpleStrategy[SimpleStrategy]
+    end
+    
+    subgraph "Result Types"
+        AbstractResult[BacktestResult]
+        VectorizedResult[VectorizedBacktestResult]
+        EventDrivenResult[EventDrivenBacktestResult]
+        
+        AbstractResult -.->|extends| VectorizedResult
+        AbstractResult -.->|extends| EventDrivenResult
+        
+        VectorService -->|produces| VectorizedResult
+        EventService -->|produces| EventDrivenResult
+    end
+    
+    Client -->|OHLCV Data| APIGateway
+    
+    %% Response flow section
+    VectorizedResult & EventDrivenResult -->|formatted as JSON| ResponseData[Response Data]
+    
+    %% GraphQL response path
+    ResponseData -->|GraphQL data| StrawberrySchema
+    StrawberrySchema -->|processed response| GraphQLEndpoint
+    GraphQLEndpoint -->|GraphQL response| APIGateway
+    
+    %% REST response path
+    ResponseData -->|REST data| FastAPI
+    FastAPI -->|REST response| APIGateway
+    
+    APIGateway -->|formatted response| Client
+    
+    VectorService -->|uses| VectorBT[vectorbt]
+    EventService -->|uses| Backtrader[backtrader]
