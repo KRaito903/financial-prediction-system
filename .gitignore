@@ -5,3 +5,8 @@ dist/
 npm-debug.log
 yarn-error.log
 router/
+
+# Sentiment news service
+services/sentiment-news-prediction-service/.venv
+services/sentiment-news-prediction-service/model/
+__pycache__/

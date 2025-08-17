@@ -6,7 +6,7 @@ class IDataProcessor(ABC):
   """
 
   @abstractmethod
-  def process(self, raw_data: str) -> str:
+  def process(self, raw_data: str):
     """
     Process the input data and return a result.
 

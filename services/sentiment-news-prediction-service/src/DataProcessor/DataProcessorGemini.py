@@ -11,7 +11,7 @@ class DataProcessorGemini(IDataProcessor):
   def __retrieve_json_from_string(self, str_json: str): 
     return json.loads(str_json)
 
-  def process(self, raw_data: str) -> str:
+  def process(self, raw_data: str):
     """
     Process the input data and return a result.
 
@@ -31,7 +31,6 @@ Here is the raw data:
     """
     res = self.__service.generate(prompt)
     res = res.strip('\n').removeprefix('```json').removesuffix('```')
-    print(res)
     return self.__retrieve_json_from_string(res)
   
   def process_array(self, list_raw_data: list):
