@@ -8,5 +8,5 @@ router/
 
 # Sentiment news service
 services/sentiment-news-prediction-service/.venv
-services/sentiment-news-prediction-service/model/
+services/sentiment-news-prediction-service/model-finbert-sentiment/
 __pycache__/
