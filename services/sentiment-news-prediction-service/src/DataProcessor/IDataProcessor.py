@@ -7,10 +7,14 @@ class IDataProcessor(ABC):
 
   @abstractmethod
   def process(self, raw_data: str) -> str:
-      """
-      Process the input data and return a result.
+    """
+    Process the input data and return a result.
 
-      :param raw_data: The input data to be processed.
-      :return: The processed result as a string.
-      """
-      ...
+    :param raw_data: The input data to be processed.
+    :return: The processed result as a string.
+    """
+    ...
+
+  @abstractmethod
+  def process_array(self, list_raw_data: list):
+    ...
