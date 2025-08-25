@@ -8,7 +8,6 @@ from typing import Optional, Dict, Any, Union, TypeVar, Generic
 # Set random seed for reproducibility
 np.random.seed(42)
 
-
 class TradingStrategy(ABC):
     """Base strategy interface following Interface Segregation Principle."""
 

@@ -4,7 +4,7 @@ matplotlib.use("TkAgg")  # Use the Tkinter GUI backend
 import matplotlib.pyplot as plt
 import os
 from pathlib import Path
-from py_services.backtestService import (
+from services.backtestService import (
     BacktestServiceFactory,
     CrossoverMAStrategy,
     VectorizedBacktestResult,
