@@ -421,7 +421,7 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
         cerebro.addanalyzer(bt.analyzers.SQN, _name='sqn')
 
         # Create data feed from processed data
-        data_feed = bt.feeds.PandasData(dataname=processed_data)
+        data_feed = bt.feeds.PandasData(dataname=processed_data) # type: ignore
         cerebro.adddata(data_feed)
 
         # Run the backtest
