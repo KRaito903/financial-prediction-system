@@ -173,6 +173,12 @@ class EventDrivenBacktestResult(BacktestResult):
     def get_portfolio(self) -> Dict[str, Any]:
         """Return the raw backtrader results for custom analysis."""
         return self.results
+    
+    def get_portfolio_values(self) -> pd.DataFrame:
+        """Return the portfolio values as a DataFrame."""
+        # Backtrader does not provide time series portfolio values directly
+        # This is a placeholder implementation
+        return pd.DataFrame(columns=['date', 'value'])
 
 
 # Define a type variable for the result type
@@ -488,7 +494,7 @@ class BacktestServiceFactory:
         """Create a backtest service of the specified type."""
         if service_type.lower() == "vectorized":
             return VectorizedBacktestService()
-        elif service_type.lower() == "event_driven":
+        elif service_type.lower() == "event-driven":
             return EventDrivenBacktestService()
         else:
             raise ValueError(f"Unknown backtest service type: {service_type}")
