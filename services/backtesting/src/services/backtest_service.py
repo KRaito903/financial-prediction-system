@@ -3,7 +3,8 @@ import vectorbt as vbt
 import backtrader as bt
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, Union, TypeVar, Generic
+from typing import Optional, Dict, Any, TypeVar, Generic
+from ..models.backtest_model import BacktestPydanticResult
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -93,7 +94,6 @@ class DataPreprocessor:
 
         return processed_data
 
-
 class BacktestResult(ABC):
     @abstractmethod
     def get_stats(self) -> Dict[str, Any]:
@@ -104,7 +104,6 @@ class BacktestResult(ABC):
     def get_portfolio(self) -> Any:
         """Return the raw portfolio object for custom analysis."""
         pass
-
 
 class VectorizedBacktestResult(BacktestResult):
     """Value object to store backtest results."""
@@ -142,7 +141,6 @@ class VectorizedBacktestResult(BacktestResult):
             return pd.DataFrame(columns=['date', 'value'])
         return self.portfolio.value().to_frame(name='value').reset_index().rename(columns={'index': 'date'})
 
-
 class EventDrivenBacktestResult(BacktestResult):
     """Value object to store event-driven backtest results."""
 
@@ -156,7 +154,7 @@ class EventDrivenBacktestResult(BacktestResult):
         """
         self.results = results
         self.strategy_name = strategy_name
-
+        
     def get_stats(self) -> Dict[str, Any]:
         """Return key performance statistics."""
         return {
@@ -165,8 +163,6 @@ class EventDrivenBacktestResult(BacktestResult):
             "sharpe_ratio": self.results.get("sharpe_ratio", 0.0),
             "max_drawdown": self.results.get("max_drawdown", 0.0),
             "win_rate": self.results.get("win_rate", 0.0),
-            "final_value": self.results.get("final_value", 0.0),
-            "initial_value": self.results.get("initial_value", 0.0),
             "total_trades": self.results.get("total_trades", 0),
         }
 
@@ -243,11 +239,6 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
         # Generate signals from the strategy
         entries, exits = strategy.generate_signals(processed_data)
 
-        # Log signal information
-        print(f"Strategy: {strategy.get_strategy_name()}")
-        print(f"Number of entry signals: {entries.sum()}")
-        print(f"Number of exit signals: {exits.sum()}")
-
         # If no signals and fallback enabled, try fallback strategy
         if use_fallback and (entries.sum() == 0 or exits.sum() == 0):
             print("No signals detected - using simple strategy as fallback")
@@ -281,7 +272,6 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
             
         # Create portfolio
         portfolio = vbt.Portfolio.from_signals(**portfolio_kwargs)
-
         return VectorizedBacktestResult(portfolio, strategy.get_strategy_name())
 
 
@@ -488,7 +478,6 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
 
 class BacktestServiceFactory:
     """Factory for creating backtest services."""
-    
     @staticmethod
     def create_service(service_type: str) -> BacktestService:
         """Create a backtest service of the specified type."""
