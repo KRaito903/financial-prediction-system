@@ -133,7 +133,7 @@ async def run_and_save_backtest(service_type: str, input: BacktestInput) -> Back
         stats = result.get_stats()
         
         # Check if the result has a portfolio to get trades from
-        if hasattr(result, 'get_portfolio'):
+        if service_type == "vectorized":
             portfolio = result.get_portfolio()
             all_trades = portfolio.trades.records_readable if portfolio else pd.DataFrame()
             winning_trades = len(all_trades[all_trades["Return"] > 0])
