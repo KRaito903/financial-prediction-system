@@ -6,6 +6,7 @@ import Login from './components/Login';
 import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import BacktestPage from './route/backtest/page';
 
 function App() {
   return (
@@ -22,6 +23,10 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/backtest"
+              element={<BacktestPage />}
             />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>

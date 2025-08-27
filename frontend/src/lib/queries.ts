@@ -29,3 +29,55 @@ export const SIGNUP_MUTATION = gql`
     }
   }
 `;
+
+export const RUN_VECTORIZED_BACKTEST = gql`
+  mutation RunVectorizedBacktest($input: BacktestInput!) {
+    runVectorizedBacktest(input: $input) {
+      status
+      strategy {
+        fastMaPeriod
+        slowMaPeriod
+      }
+      data {
+        Date
+        portfolioValue
+      }
+      metrics {
+        totalReturn
+        sharpeRatio
+        maxDrawdown
+        winRate
+        profitFactor
+        totalTrades
+        winningTrades
+        losingTrades
+      }
+    }
+  }
+`;
+
+export const RUN_EVENT_DRIVEN_BACKTEST = gql`
+  mutation RunEventDrivenBacktest($input: BacktestInput!) {
+    runEventDrivenBacktest(input: $input) {
+      status
+      strategy {
+        fastMaPeriod
+        slowMaPeriod
+      }
+      data {
+        Date
+        portfolioValue
+      }
+      metrics {
+        totalReturn
+        sharpeRatio
+        maxDrawdown
+        winRate
+        profitFactor
+        totalTrades
+        winningTrades
+        losingTrades
+      }
+    }
+  }
+`;
