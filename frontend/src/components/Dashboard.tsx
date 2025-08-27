@@ -1,13 +1,74 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
+import { CandlestickSeries, createChart, ColorType } from 'lightweight-charts';
+
+export const ChartComponent = (props) => {
+  const { data,
+        colors: {
+            backgroundColor = 'white',
+            textColor = 'black',
+            upColor = '#26a69a',
+            downColor = '#ef5350',
+            borderVisible = false,
+            wickUpColor = '#26a69a',
+            wickDownColor = '#ef5350',
+        } = {},
+      } = props
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!chartContainerRef.current) return;
+    
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+          background: { type: ColorType.Solid, color: backgroundColor },
+          textColor,
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 300,
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: true,
+      },
+    });
+    const handleResize = () => {
+      chart.applyOptions({ width: chartContainerRef.current?.clientWidth });
+    }
+    chart.timeScale().fitContent();
+    const newSeries = chart.addSeries(CandlestickSeries, { 
+      upColor, 
+      downColor, 
+      borderVisible,
+      wickUpColor,
+      wickDownColor,
+    });
+    newSeries.setData(data);
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+        window.removeEventListener('resize', handleResize);
+
+        chart.remove();
+    };
+  }, [data, backgroundColor, textColor, upColor, downColor, borderVisible, wickUpColor, wickDownColor])
+  
+  return (
+    <div className="relative">
+      <div ref={chartContainerRef} />
+    </div>
+  );
+}
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  // const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { connected, candlestickData, error } = useSocket();
 
   const handleLogout = () => {
-    logout();
+    // logout();
     navigate('/login');
   };
 
@@ -22,8 +83,15 @@ const Dashboard: React.FC = () => {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Connection Status */}
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm text-gray-700">
+                  {connected ? 'Live Data' : 'Disconnected'}
+                </span>
+              </div>
               <span className="text-sm text-gray-700">
-                Welcome, {user?.name}
+                {/* Welcome, {user?.name} */}
               </span>
               <button
                 onClick={handleLogout}
@@ -44,23 +112,42 @@ const Dashboard: React.FC = () => {
                 Dashboard
               </h2>
               <p className="text-gray-600 mb-6">
-                Welcome to your financial prediction dashboard, {user?.name}!
+                Real-time BTC/USDT candlestick chart powered by Binance data
               </p>
               
-              <div className="bg-white p-6 rounded-lg shadow">
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <h3 className="text-red-800 font-medium">Connection Error</h3>
+                  <p className="text-red-600 text-sm mt-1">{error}</p>
+                </div>
+              )}
+              
+              <div className="bg-white p-6 rounded-lg shadow mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  User Information
+                  Market Data Status
                 </h3>
                 <div className="text-left space-y-2">
-                  <p><span className="font-medium">Username:</span> {user?.username}</p>
-                  <p><span className="font-medium">Name:</span> {user?.name}</p>
-                  <p><span className="font-medium">Email:</span> {user?.email}</p>
+                  <p><span className="font-medium">Connection:</span> {connected ? '✅ Connected' : '❌ Disconnected'}</p>
+                  <p><span className="font-medium">Data Points:</span> {candlestickData.length}</p>
+                  <p><span className="font-medium">Symbol:</span> BTC/USDT</p>
+                  <p><span className="font-medium">Interval:</span> 1 minute</p>
                 </div>
               </div>
               
-              <p className="text-sm text-gray-500 mt-6">
-                Financial prediction features coming soon...
-              </p>
+              <div className="mt-6">
+                {candlestickData.length > 0 ? (
+                  <ChartComponent data={candlestickData} />
+                ) : (
+                  <div className="bg-white p-8 rounded-lg shadow text-center">
+                    <div className="animate-pulse">
+                      <div className="h-64 bg-gray-200 rounded"></div>
+                    </div>
+                    <p className="text-gray-500 mt-4">
+                      {connected ? 'Waiting for market data...' : 'Connecting to data stream...'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
