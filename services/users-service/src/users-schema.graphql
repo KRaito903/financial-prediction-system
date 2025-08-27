@@ -3,10 +3,23 @@ extend schema
 
 type User {
   id: ID!
+  username: String!
+  password: String!
   name: String!
   email: String!
 }
 
+type AuthPayload {
+  success: Boolean!
+  message: String!
+  user: User
+}
+
 type Query {
   listUsers: [User!]!
+  login(username: String!, password: String!): AuthPayload!
+}
+
+type Mutation {
+  signup(username: String!, password: String!, name: String!, email: String!): AuthPayload!
 }

@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "compile": "tsc",
+    "compile": "tsc && cp src/*.graphql dist/src/ && cp -r src/datasources/*.json dist/src/datasources/",
     "start": "npm run compile && node ./dist/src/index.js",
-    "dev": "tsx watch ./src/index.ts",
+    "dev": "ts-node-dev --respawn ./src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "generate": "graphql-codegen"
   },
