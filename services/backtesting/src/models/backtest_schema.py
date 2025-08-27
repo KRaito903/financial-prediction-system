@@ -9,19 +9,11 @@ from ..utils.mongodb_connector import get_database
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..models.backtest_model import BacktestPydanticResult
 from ..services.backtest_database import BacktestDatabase, BacktestMapper
+from ..services.OHLCV_fetcher import BinanceOHLCV
+import datetime
 
 
 # Input types
-@strawberry.input
-class OHLCVDataInput:
-    Date: str
-    Open: float
-    High: float
-    Low: float
-    Close: float
-    Volume: float
-
-
 @strawberry.input
 class MACrossoverParamsInput:
     fast: int = 20
@@ -29,10 +21,19 @@ class MACrossoverParamsInput:
 
 
 @strawberry.input
+class OHLCVFetchInput:
+    symbol: str
+    interval: str = "1d"
+    limit: int = 500
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+@strawberry.input
 class BacktestInput:
     user_id: str
     symbol: str
-    data: List[OHLCVDataInput]
+    fetch_input: OHLCVFetchInput
     maCrossoverParams: Optional[MACrossoverParamsInput] = None
     period: str = "1D"
     initCash: float = 10000.0
@@ -44,6 +45,15 @@ class BacktestInput:
 
 
 # Output types
+@strawberry.type
+class OHLCVFetchResult:
+    Date: str
+    Open: float
+    High: float
+    Low: float
+    Close: float
+    Volume: float
+
 @strawberry.type
 class BacktestMetrics:
     total_return: float
@@ -78,7 +88,7 @@ class BacktestResult:
 
 
 # Helper function to transform input data
-def transform_input_data(input_data: List[OHLCVDataInput]) -> pd.DataFrame:
+def transform_input_data(input_data: List[OHLCVFetchResult]) -> pd.DataFrame:
     data_dict_list = [
         {
             "Date": item.Date,
@@ -96,16 +106,77 @@ def transform_input_data(input_data: List[OHLCVDataInput]) -> pd.DataFrame:
     return data
 
 
+async def fetch_ohlcv_data(
+    symbol: str,
+    interval: str,
+    limit: int = 1000,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """_summary_
+
+    Args:
+        symbol (str): Pair of coins symbol (e.g., 'BTCUSDT')
+        interval (str): Kline interval ('1m', '5m', '1h', '1d', etc.)
+        limit (int, optional): _description_. Defaults to 1000.
+        start_date (str, optional): Start date in 'YYYY-MM-DD' format. Defaults to None.
+        end_date (str, optional): End date in 'YYYY-MM-DD' format. Defaults
+
+    Returns:
+        list[dict]: List of OHLCV data points
+    """
+    fetcher = BinanceOHLCV()
+    start_date_unix = (
+        int(datetime.datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000) if start_date else None
+    )
+    end_date_unix = int(datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000) if end_date else None
+    data = fetcher.get_ohlcv(
+        symbol,
+        interval,
+        limit=limit,
+        start_time=start_date_unix,
+        end_time=end_date_unix,
+    )
+    return data
+
+
 # Abstracted backtest logic
-# Abstracted backtest logic
-async def run_and_save_backtest(service_type: str, input: BacktestInput) -> BacktestResult:
+async def run_and_save_backtest(
+    service_type: str, input: BacktestInput
+) -> BacktestResult:
     # This is the unified function that both mutations will call
     service = BacktestServiceFactory.create_service(service_type)
 
-    data = transform_input_data(input.data)
+    # Always fetch OHLCV data
+    fetched_data = await fetch_ohlcv_data(
+        symbol=input.fetch_input.symbol,
+        interval=input.fetch_input.interval,
+        limit=input.fetch_input.limit,
+        start_date=input.fetch_input.start_date,
+        end_date=input.fetch_input.end_date,
+    )
+    # Transform fetched data to DataFrame
+    data_dict_list = [
+        {
+            "Date": item["Date"],
+            "Open": item["Open"],
+            "High": item["High"],
+            "Low": item["Low"],
+            "Close": item["Close"],
+            "Volume": item["Volume"],
+        }
+        for item in fetched_data
+    ]
+    data = pd.DataFrame(data_dict_list)
+    data["Date"] = pd.to_datetime(data["Date"])
+    data.set_index("Date", inplace=True)
     ma_params = {
-        "fast_ma_period": input.maCrossoverParams.fast if input.maCrossoverParams else 20,
-        "slow_ma_period": input.maCrossoverParams.slow if input.maCrossoverParams else 50,
+        "fast_ma_period": (
+            input.maCrossoverParams.fast if input.maCrossoverParams else 20
+        ),
+        "slow_ma_period": (
+            input.maCrossoverParams.slow if input.maCrossoverParams else 50
+        ),
     }
     strategy = CrossoverMAStrategy(**ma_params)
     backtest_params = {
@@ -122,24 +193,28 @@ async def run_and_save_backtest(service_type: str, input: BacktestInput) -> Back
 
     try:
         result = service.run_backtest(**backtest_params)
-        
+
         # Extract and format data for both GraphQL response and DB
         portfolio_values = result.get_portfolio_values()
         portfolio_data = [
             {"Date": str(date), "portfolio_value": float(row["value"])}
             for date, row in portfolio_values.iterrows()
         ]
-        
+
         stats = result.get_stats()
-        
+
         # Check if the result has a portfolio to get trades from
         if service_type == "vectorized":
             portfolio = result.get_portfolio()
-            all_trades = portfolio.trades.records_readable if portfolio else pd.DataFrame()
+            all_trades = (
+                portfolio.trades.records_readable if portfolio else pd.DataFrame()
+            )
             winning_trades = len(all_trades[all_trades["Return"] > 0])
             losing_trades = len(all_trades[all_trades["Return"] <= 0])
             total_trades = len(all_trades)
-            win_rate = (winning_trades / total_trades) * 100 if total_trades > 0 else 0.0
+            win_rate = (
+                (winning_trades / total_trades) * 100 if total_trades > 0 else 0.0
+            )
         else:
             # Handle event-driven results which may not have a portfolio object
             winning_trades = stats.get("winning_trades", 0)
@@ -168,25 +243,30 @@ async def run_and_save_backtest(service_type: str, input: BacktestInput) -> Back
         db: AsyncIOMotorDatabase = get_database()
         mapper = BacktestMapper()
         database = BacktestDatabase(db, mapper)
-        
+
         pydantic_result = {
             "user_id": input.user_id,
             "symbol": input.symbol,
-            "strategy": input.maCrossoverParams.__dict__ if input.maCrossoverParams else {},
+            "strategy": (
+                input.maCrossoverParams.__dict__ if input.maCrossoverParams else {}
+            ),
             "total_return": graphql_result.metrics.total_return,
             "total_trades": graphql_result.metrics.total_trades,
             "winning_trades": graphql_result.metrics.winning_trades,
             "losing_trades": graphql_result.metrics.losing_trades,
             "win_rate": graphql_result.metrics.win_rate,
             "result": stats,
-            "portfolio_values": [{"date": pv.Date, "value": pv.portfolio_value} for pv in graphql_result.data],
+            "portfolio_values": [
+                {"date": pv.Date, "value": pv.portfolio_value}
+                for pv in graphql_result.data
+            ],
         }
         backtest_doc = BacktestPydanticResult(**pydantic_result)
-        
+
         insert_result = await database.insert_backtest(backtest_doc, input.user_id)
         if insert_result:
             print(f"Backtest result saved with ID: {insert_result.id}")
-            
+
         return graphql_result
 
     except Exception as e:
@@ -215,6 +295,24 @@ class Query:
     def health() -> str:
         return "GraphQL API is healthy"
 
+    @strawberry.field
+    async def fetch_ohlcv(self, input: OHLCVFetchInput) -> List[OHLCVFetchResult]:
+        data = await fetch_ohlcv_data(
+            symbol=input.symbol,
+            interval=input.interval,
+            limit=input.limit,
+            start_date=input.start_date,
+            end_date=input.end_date,
+        )
+        return [OHLCVFetchResult(**{
+            "Date": str(item["Date"]),
+            "Open": item["Open"],
+            "High": item["High"],
+            "Low": item["Low"],
+            "Close": item["Close"],
+            "Volume": item["Volume"],
+        }) for item in data]
+
 
 @strawberry.type
 class Mutation:
@@ -227,5 +325,6 @@ class Mutation:
     async def run_event_driven_backtest(self, input: BacktestInput) -> BacktestResult:
         result: BacktestResult = await run_and_save_backtest("event-driven", input)
         return result
-    
+
+
 schema = strawberry.Schema(query=Query, mutation=Mutation)

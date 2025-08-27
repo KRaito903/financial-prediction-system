@@ -268,7 +268,7 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
         if fixed_size is not None:
             portfolio_kwargs["size"] = fixed_size
         elif percent_size is not None:
-            portfolio_kwargs["size_pct"] = percent_size
+            portfolio_kwargs["size"] = percent_size
             
         # Create portfolio
         portfolio = vbt.Portfolio.from_signals(**portfolio_kwargs)
