@@ -1,7 +1,5 @@
-import requests
-import pandas as pd
+import aiohttp
 from datetime import datetime, timedelta
-import time
 import os
 from dotenv import load_dotenv
 
@@ -11,9 +9,9 @@ load_dotenv()
 class BinanceOHLCV:
     def __init__(self):
         self.base_url = os.getenv("BINANCE_API_URL", "https://api.binance.com")
-        self.session = requests.Session()
+        self.session = aiohttp.ClientSession()
 
-    def get_ohlcv(
+    async def get_ohlcv(
         self, symbol, interval, limit=1000, start_time=None, end_time=None
     ) -> list[dict]:
         """
@@ -43,11 +41,12 @@ class BinanceOHLCV:
             "endTime": end_time,
             "limit": limit,
         }
-        response = self.session.get(url, params=params)
-        data = response.json()
-
-        if response.status_code != 200:
-            raise Exception(f"Error fetching data: {data}")
+        
+        async with self.session.get(url, params=params) as response:
+            data = await response.json()
+        await self.session.close()
+        if "code" in data and data["code"] != 200:
+            raise Exception(f"Error fetching data: {data['msg']}")
 
         ohlcv = []
         for entry in data:

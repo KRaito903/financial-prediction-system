@@ -9,7 +9,8 @@ from ..utils.mongodb_connector import get_database
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..models.backtest_model import BacktestPydanticResult
 from ..services.backtest_database import BacktestDatabase, BacktestMapper
-from ..services.OHLCV_fetcher import BinanceOHLCV
+from ..utils.OHLCV_fetcher import BinanceOHLCV
+from ..utils.coint_list_fetcher import CoinListFetcher
 import datetime
 
 
@@ -45,6 +46,10 @@ class BacktestInput:
 
 
 # Output types
+@strawberry.type
+class CoinList:
+    coins: Optional[List[str]] = None
+
 @strawberry.type
 class OHLCVFetchResult:
     Date: str
@@ -130,7 +135,7 @@ async def fetch_ohlcv_data(
         int(datetime.datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000) if start_date else None
     )
     end_date_unix = int(datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000) if end_date else None
-    data = fetcher.get_ohlcv(
+    data = await fetcher.get_ohlcv(
         symbol,
         interval,
         limit=limit,
@@ -312,7 +317,12 @@ class Query:
             "Close": item["Close"],
             "Volume": item["Volume"],
         }) for item in data]
-
+        
+    @strawberry.field
+    async def fetch_coin_list(self) -> CoinList:
+        fetcher = CoinListFetcher()
+        coins = await fetcher.fetch_coin_list()
+        return CoinList(coins=coins)
 
 @strawberry.type
 class Mutation:
