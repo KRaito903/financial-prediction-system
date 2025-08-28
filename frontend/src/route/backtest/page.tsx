@@ -58,7 +58,7 @@ import {
     RUN_EVENT_DRIVEN_BACKTEST,
     FETCH_TRADING_PAIRS,
 } from "@/lib/queries";
-import { format, toDate, isValid } from "date-fns";
+import { format, toDate } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -252,7 +252,7 @@ const BacktestPage: React.FC = () => {
 
         if (backtestType === "vectorized") {
             // Use index-based x-axis with numbers like 1, 2, etc.
-            const chartData = result.data.map((item, index) => ({
+            const chartData = result.data.map((item) => ({
                 index: item.Date,
                 portfolioValue: item.portfolioValue,
             }));
