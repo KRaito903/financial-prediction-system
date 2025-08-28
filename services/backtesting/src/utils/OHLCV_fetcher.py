@@ -20,7 +20,7 @@ class BinanceOHLCV:
         Args:
             symbol (str): Trading pair symbol (e.g., 'BTCUSDT')
             interval (str): Kline interval ('1m', '5m', '1h', '1d', etc.)
-            limit (int): Number of records (max 1000)
+            limit (int): Number of records (max 1000 per Binance API rule)
             start_time (int): Start time (Unix timestamp in ms)
             end_time (int): End time (Unix timestamp in ms)
 

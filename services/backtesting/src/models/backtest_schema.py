@@ -25,7 +25,7 @@ class MACrossoverParamsInput:
 class OHLCVFetchInput:
     symbol: str
     interval: str = "1d"
-    limit: int = 500
+    limit: int = 1000
     start_date: Optional[str] = None
     end_date: Optional[str] = None
 

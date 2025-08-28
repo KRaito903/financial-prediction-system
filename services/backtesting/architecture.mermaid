@@ -3,27 +3,35 @@ config:
   theme: redux-dark
 ---
 graph TD
-    Client([Client Application]) -->|API Requests| APIGateway
+    Client([Client Application]) -->|API Requests| GraphQLEndpoint
     
-    subgraph "API Gateway Layer"
-        APIGateway([API Gateway])
-        APIGateway -->|REST| FastAPI
-        APIGateway -->|GraphQL| GraphQLEndpoint
+    subgraph "API Gateway Layer (GraphQL)"
+        GraphQLEndpoint([GraphQL Endpoint])
+        GraphQLEndpoint -->|handles GraphQL| StrawberrySchema
+        GraphQLEndpoint -->|routes REST| FastAPI
     end
     
     subgraph "API Layer"
         FastAPI([FastAPI])
-        GraphQLEndpoint([GraphQL Endpoint])
         StrawberrySchema([Strawberry Schema])
         
         FastAPI -->|uses| InputModel[Pydantic Models]
         FastAPI -->|exposes| RestEndpoints["REST Endpoints"]
-        GraphQLEndpoint -->|processes with| StrawberrySchema
         StrawberrySchema -->|defines| GraphQLTypes["GraphQL Types"]
         StrawberrySchema -->|defines| GraphQLQueries["GraphQL Queries"]
         StrawberrySchema -->|defines| GraphQLMutations["GraphQL Mutations"]
         
         StrawberrySchema -->|forwards processed request to| FastAPI
+    end
+    
+    subgraph "Utils Layer"
+        OHLCVFetcher[BinanceOHLCV]
+        CoinListFetcher[CoinListFetcher]
+        MongoConnector[mongodb_connector]
+        
+        StrawberrySchema -->|uses| OHLCVFetcher
+        StrawberrySchema -->|uses| CoinListFetcher
+        FastAPI -->|uses| MongoConnector
     end
     
     FastAPI --> Factory
@@ -54,7 +62,18 @@ graph TD
         EventService -->|produces| EventDrivenResult
     end
     
-    Client -->|OHLCV Data| APIGateway
+    subgraph "Persistence Layer"
+        BacktestDatabase[BacktestDatabase]
+        BacktestMapper[BacktestMapper]
+        BacktestModel[BacktestPydanticResult]
+        
+        FastAPI -->|saves to| BacktestDatabase
+        BacktestDatabase -->|uses| BacktestMapper
+        BacktestDatabase -->|maps to| BacktestModel
+        BacktestDatabase -->|connects via| MongoConnector
+    end
+    
+    Client -->|OHLCV Data| GraphQLEndpoint
     
     %% Response flow section
     VectorizedResult & EventDrivenResult -->|formatted as JSON| ResponseData[Response Data]
@@ -62,13 +81,16 @@ graph TD
     %% GraphQL response path
     ResponseData -->|GraphQL data| StrawberrySchema
     StrawberrySchema -->|processed response| GraphQLEndpoint
-    GraphQLEndpoint -->|GraphQL response| APIGateway
     
     %% REST response path
     ResponseData -->|REST data| FastAPI
-    FastAPI -->|REST response| APIGateway
+    FastAPI -->|REST response| GraphQLEndpoint
     
-    APIGateway -->|formatted response| Client
+    GraphQLEndpoint -->|formatted response| Client
     
     VectorService -->|uses| VectorBT[vectorbt]
     EventService -->|uses| Backtrader[backtrader]
+    
+    OHLCVFetcher -->|fetches from| BinanceAPI[Binance API]
+    CoinListFetcher -->|fetches from| BinanceAPI
+    MongoConnector -->|connects to| MongoDB[mongodb]
