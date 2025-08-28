@@ -16,3 +16,10 @@ services/router/.env
 # Apollo Router
 supergraph.graphql
 router/
+
+#AI-predictions
+__pycache__/
+timexer_env/
+checkpoints/
+test_results/
+results/
