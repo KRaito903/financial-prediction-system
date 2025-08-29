@@ -97,8 +97,8 @@ services:
     # ports:
     #   - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: oSVxKoSNE17bLs3Q18MbAmQf1pWn5au3
+      - POSTGRES_USER=$SENTIMENT_DATABASE_POSTGRES_USER
+      - POSTGRES_PASSWORD=$SENTIMENT_DATABASE_POSTGRES_PASSWORD
 
   sentiment-service:
     depends_on:
@@ -111,7 +111,6 @@ services:
     container_name: sentiment-service
     environment:
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://postgres:oSVxKoSNE17bLs3Q18MbAmQf1pWn5au3@sentiment-service-database/news_sentiment
+      - DATABASE_URL=postgresql://$SENTIMENT_DATABASE_POSTGRES_USER:$SENTIMENT_DATABASE_POSTGRES_PASSWORD@sentiment-service-database/$SENTIMENT_DATABASE_DATABASE
       - GEMINI_MODEL=gemini-2.0-flash
-      - GEMINI_API_KEY=AIzaSyAHGeZZZiSj_l1TQZ3wzApgRv15pLUbSyA
-    
+      - GEMINI_API_KEY=$SENTIMENT_SERVICE_GEMINI_API_KEY

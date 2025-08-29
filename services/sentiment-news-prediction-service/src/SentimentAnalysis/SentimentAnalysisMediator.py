@@ -60,8 +60,11 @@ class SentimentAnalysisMediator(ISentimentAnalysis):
     # 1. crawl the raw news
     raw_news = self.__crawl_news()
 
+
     # 2. process the raw news
     processed_news = self.__get_processed_news(raw_news)
+    for news in processed_news:
+      print(news)
       
     # 3. predict
     input_data = self.__prep_data_for_prediction(processed_news)

@@ -1,7 +1,7 @@
 import os
 import atexit
-from dotenv import load_dotenv
-load_dotenv()
+# from dotenv import load_dotenv
+# load_dotenv()
 
 from SentimentAnalysis.SentimentAnalysisMediator import SentimentAnalysisMediator
 from SentimentSelector.SentimentSelectorMediator import SentimentSelectorMediator

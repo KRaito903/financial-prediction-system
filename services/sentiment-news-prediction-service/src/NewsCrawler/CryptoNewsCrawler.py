@@ -3,15 +3,15 @@ from .RawCryptoNews import RawCryptoNews
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
+import random
+import time
 
 URL = "https://cryptonews.com/news/page/1/"
 
 class CryptoNewsCrawler(NewsCrawler):
   __url = URL
   __headers = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    'Connection': 'keep-alive',
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0"
   }
 
   def __init__(self):
@@ -26,6 +26,7 @@ class CryptoNewsCrawler(NewsCrawler):
     temp_news = self.__get_list_metadata(response.content)
     res = []
     for news in temp_news:
+      time.sleep(random.uniform(0.5, 2))
       sub_header = self.__get_subheader_from_link(url=news['link'])
       res.append( RawCryptoNews(title=news['title'], sub_header=sub_header, published_time=news['published_time'], url=news['link']) )
     return res
@@ -37,7 +38,7 @@ class CryptoNewsCrawler(NewsCrawler):
     :param raw_html: The raw HTML content to parse.
     :return: A list of CryptoNews objects containing the subject, text, and title.
     """
-    response = requests.get(url=url, headers=self.__headers)
+    response = requests.get(url=url, headers=CryptoNewsCrawler.__headers)
     if (response.status_code != 200):
       raise Exception(f"Failed to fetch news content: {response.status_code}")
     soup = BeautifulSoup(response.content, 'html.parser')
