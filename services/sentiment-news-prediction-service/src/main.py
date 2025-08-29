@@ -62,7 +62,6 @@ for message in consumer:
   try:
     values = message.value
     request = KafkaRequest(id=values['id'], from_service=values['from_service'], name=values['name'], payload=values['payload'])
-    # print(f"Received request: {request.__dict__}")
     match request.name:
       case 'analyze':
         sentiment_analysis.process()
@@ -70,13 +69,13 @@ for message in consumer:
       case 'select':
         n_records = request.payload.get('n') if request.payload and request.payload.get('n') else 1
         res = sentiment_selector.process(n_records=n_records)
-        print(f"Sending response: {[item.__dict__ for item in res]}")
         producer.send('sentiment_news_responses', value=str({
           'id': request.id,
           'from_service': 'sentiment-service',
           'name': request.name,
-          'payload': [item.__dict__ for item in res]
+          'payload': [dict(item)for item in res]
         }))
+        print(f"Response sent for request id {request.id}.")
       case _:
         print(f"Unknown request name: {request.name}")
         continue

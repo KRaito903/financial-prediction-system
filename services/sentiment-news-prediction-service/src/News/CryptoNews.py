@@ -61,3 +61,16 @@ class CryptoNews:
   
   def __repr__(self):
     return str(self)
+  
+  def __dict__(self):
+    return {
+      'id': self.__id,
+      'subject': self.__subject,
+      'text': self.__text,
+      'title': self.__title,
+      'url': self.__url,
+      'published_time': self.__published_time,
+      'sentiment_score': self.__sentiment_score,
+      'created_at': self.__created_at,
+      'last_modified_at': self.__last_modified_at
+    }

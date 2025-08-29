@@ -5,20 +5,19 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 import random
 import time
+from curl_cffi import requests
 
 URL = "https://cryptonews.com/news/page/1/"
 
 class CryptoNewsCrawler(NewsCrawler):
   __url = URL
-  __headers = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0"
-  }
+  # __headers = { "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0" }
 
   def __init__(self):
     super().__init__()
 
   def crawl(self) -> list:
-    response = requests.get(url=CryptoNewsCrawler.__url, headers=CryptoNewsCrawler.__headers)
+    response = requests.get(url=CryptoNewsCrawler.__url, impersonate='firefox135', timeout=10) # headers=CryptoNewsCrawler.__headers
 
     if (response.status_code != 200):
       raise Exception(f"Failed to fetch news: {response.status_code}")
@@ -38,7 +37,7 @@ class CryptoNewsCrawler(NewsCrawler):
     :param raw_html: The raw HTML content to parse.
     :return: A list of CryptoNews objects containing the subject, text, and title.
     """
-    response = requests.get(url=url, headers=CryptoNewsCrawler.__headers)
+    response = requests.get(url=url, impersonate='firefox135', timeout=10)
     if (response.status_code != 200):
       raise Exception(f"Failed to fetch news content: {response.status_code}")
     soup = BeautifulSoup(response.content, 'html.parser')
