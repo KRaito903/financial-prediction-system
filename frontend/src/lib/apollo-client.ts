@@ -1,10 +1,9 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 
-const httpLink = createHttpLink({
-  uri: '/graphql',
+const backtestLink = createHttpLink({
+  uri: 'http://127.0.0.1:5050/graphql',
 });
-
-export const apolloClient = new ApolloClient({
-  link: httpLink,
+export const backtestClient = new ApolloClient({
+  link: backtestLink, // You can switch between backtestLink and binanceLink as needed
   cache: new InMemoryCache(),
 });
