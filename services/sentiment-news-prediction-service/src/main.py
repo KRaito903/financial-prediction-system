@@ -62,7 +62,7 @@ for message in consumer:
   try:
     values = message.value
     request = KafkaRequest(id=values['id'], from_service=values['from_service'], name=values['name'], payload=values['payload'])
-    print(f"Received request: {request.__dict__}")
+    # print(f"Received request: {request.__dict__}")
     match request.name:
       case 'analyze':
         sentiment_analysis.process()
