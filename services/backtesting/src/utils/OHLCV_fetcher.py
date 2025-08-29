@@ -9,7 +9,6 @@ load_dotenv()
 class BinanceOHLCV:
     def __init__(self):
         self.base_url = os.getenv("BINANCE_API_URL", "https://api.binance.com")
-        self.session = aiohttp.ClientSession()
 
     async def get_ohlcv(
         self, symbol, interval, limit=1000, start_time=None, end_time=None
@@ -27,37 +26,37 @@ class BinanceOHLCV:
         Returns:
             list of dict: List of OHLCV data points
         """
-        url = f"{self.base_url}/api/v3/klines"
-        if start_time is None:
-            start_time = int(
-                (datetime.now() - timedelta(days=limit)).timestamp() * 1000
-            )  # Default to 'limit' days ago in ms
-        if end_time is None:
-            end_time = int(datetime.now().timestamp() * 1000)  # Current time in ms
-        params = {
-            "symbol": symbol,
-            "interval": interval,
-            "startTime": start_time,
-            "endTime": end_time,
-            "limit": limit,
-        }
-        
-        async with self.session.get(url, params=params) as response:
-            data = await response.json()
-        await self.session.close()
-        if "code" in data and data["code"] != 200:
-            raise Exception(f"Error fetching data: {data['msg']}")
+        async with aiohttp.ClientSession() as session:
+            url = f"{self.base_url}/api/v3/klines"
+            if start_time is None:
+                start_time = int(
+                    (datetime.now() - timedelta(days=limit)).timestamp() * 1000
+                )  # Default to 'limit' days ago in ms
+            if end_time is None:
+                end_time = int(datetime.now().timestamp() * 1000)  # Current time in ms
+            params = {
+                "symbol": symbol,
+                "interval": interval,
+                "startTime": start_time,
+                "endTime": end_time,
+                "limit": limit,
+            }
 
-        ohlcv = []
-        for entry in data:
-            ohlcv.append(
-                {
-                    "Date": datetime.fromtimestamp(entry[0] / 1000),
-                    "Open": float(entry[1]),
-                    "High": float(entry[2]),
-                    "Low": float(entry[3]),
-                    "Close": float(entry[4]),
-                    "Volume": float(entry[5]),
-                }
-            )
+            async with session.get(url, params=params) as response:
+                data = await response.json()
+            if "code" in data and data["code"] != 200:
+                raise Exception(f"Error fetching data: {data['msg']}")
+
+            ohlcv = []
+            for entry in data:
+                ohlcv.append(
+                    {
+                        "Date": datetime.fromtimestamp(entry[0] / 1000),
+                        "Open": float(entry[1]),
+                        "High": float(entry[2]),
+                        "Low": float(entry[3]),
+                        "Close": float(entry[4]),
+                        "Volume": float(entry[5]),
+                    }
+                )
         return ohlcv

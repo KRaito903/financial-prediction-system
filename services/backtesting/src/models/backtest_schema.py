@@ -45,10 +45,16 @@ class BacktestInput:
     useFallback: bool = True
 
 
+@strawberry.input
+class HistoricalDataInput:
+    user_id: str
+
+
 # Output types
 @strawberry.type
 class CoinList:
     coins: Optional[List[str]] = None
+
 
 @strawberry.type
 class OHLCVFetchResult:
@@ -59,16 +65,14 @@ class OHLCVFetchResult:
     Close: float
     Volume: float
 
+
 @strawberry.type
 class BacktestMetrics:
+    strategy_name: str = "Moving Average Crossover"
     total_return: float
     sharpe_ratio: float
     max_drawdown: float
     win_rate: float
-    profit_factor: float
-    total_trades: Optional[int] = None
-    winning_trades: Optional[int] = None
-    losing_trades: Optional[int] = None
 
 
 @strawberry.type
@@ -86,10 +90,18 @@ class MAStrategy:
 
 @strawberry.type
 class BacktestResult:
+    id: str
+    symbol: str
     status: str
     strategy: Optional[MAStrategy] = None
     data: List[PortfolioValue]
     metrics: BacktestMetrics
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    winning_trades: int
+    losing_trades: int
+    total_trades: int
+    profit_factor: Optional[float] = None
 
 
 # Helper function to transform input data
@@ -132,9 +144,15 @@ async def fetch_ohlcv_data(
     """
     fetcher = BinanceOHLCV()
     start_date_unix = (
-        int(datetime.datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000) if start_date else None
+        int(datetime.datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000)
+        if start_date
+        else None
     )
-    end_date_unix = int(datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000) if end_date else None
+    end_date_unix = (
+        int(datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000)
+        if end_date
+        else None
+    )
     data = await fetcher.get_ohlcv(
         symbol,
         interval,
@@ -229,6 +247,8 @@ async def run_and_save_backtest(
 
         # Create the GraphQL response object
         graphql_result = BacktestResult(
+            id="",  # Placeholder, as mutations don't have an ID yet; can be set if needed
+            symbol=input.symbol,
             status="success",
             data=[PortfolioValue(**pv) for pv in portfolio_data],
             metrics=BacktestMetrics(
@@ -236,12 +256,14 @@ async def run_and_save_backtest(
                 sharpe_ratio=stats.get("sharpe_ratio", 0.0),
                 max_drawdown=stats.get("max_drawdown", 0.0),
                 win_rate=win_rate,
-                profit_factor=stats.get("profit_factor", 0.0),
-                total_trades=total_trades,
-                winning_trades=winning_trades,
-                losing_trades=losing_trades,
             ),
+            winning_trades=winning_trades,
+            losing_trades=losing_trades,
+            total_trades=total_trades,
+            profit_factor=stats.get("profit_factor", None),
             strategy=MAStrategy(**ma_params),
+            created_at=datetime.datetime.utcnow(),
+            updated_at=datetime.datetime.utcnow(),
         )
 
         # Save to MongoDB
@@ -249,20 +271,29 @@ async def run_and_save_backtest(
         mapper = BacktestMapper()
         database = BacktestDatabase(db, mapper)
 
+        # Fix strategy dict keys to match expected model attributes
+        strategy_dict = {}
+        if input.maCrossoverParams:
+            strategy_dict = {
+                "fast_ma_period": input.maCrossoverParams.fast,
+                "slow_ma_period": input.maCrossoverParams.slow,
+            }
+
         pydantic_result = {
             "user_id": input.user_id,
             "symbol": input.symbol,
-            "strategy": (
-                input.maCrossoverParams.__dict__ if input.maCrossoverParams else {}
-            ),
+            "strategy": strategy_dict,
             "total_return": graphql_result.metrics.total_return,
-            "total_trades": graphql_result.metrics.total_trades,
-            "winning_trades": graphql_result.metrics.winning_trades,
-            "losing_trades": graphql_result.metrics.losing_trades,
+            "total_trades": graphql_result.total_trades,
+            "winning_trades": graphql_result.winning_trades,
+            "losing_trades": graphql_result.losing_trades,
             "win_rate": graphql_result.metrics.win_rate,
-            "result": stats,
-            "portfolio_values": [
-                {"date": pv.Date, "value": pv.portfolio_value}
+            "sharpe_ratio": stats.get("sharpe_ratio", 0.0),
+            "max_drawdown": stats.get("max_drawdown", 0.0),
+            "profit_factor": stats.get("profit_factor", 0.0),
+            "metrics": {**stats, "strategy_name": "Moving Average Crossover"},
+            "data": [
+                {"Date": pv.Date, "portfolio_value": pv.portfolio_value}
                 for pv in graphql_result.data
             ],
         }
@@ -271,12 +302,15 @@ async def run_and_save_backtest(
         insert_result = await database.insert_backtest(backtest_doc, input.user_id)
         if insert_result:
             print(f"Backtest result saved with ID: {insert_result.id}")
+            graphql_result.id = str(insert_result.id)  # Update ID after saving
 
         return graphql_result
 
     except Exception as e:
         print(f"Error during backtest: {e}")
         return BacktestResult(
+            id="",
+            symbol=input.symbol,
             status=f"error: {str(e)}",
             data=[],
             metrics=BacktestMetrics(
@@ -284,12 +318,14 @@ async def run_and_save_backtest(
                 sharpe_ratio=0.0,
                 max_drawdown=0.0,
                 win_rate=0.0,
-                profit_factor=0.0,
-                total_trades=0,
-                winning_trades=0,
-                losing_trades=0,
             ),
             strategy=None,
+            profit_factor=0.0,
+            total_trades=0,
+            winning_trades=0,
+            losing_trades=0,
+            created_at=datetime.datetime.utcnow(),
+            updated_at=datetime.datetime.utcnow(),
         )
 
 
@@ -309,20 +345,75 @@ class Query:
             start_date=input.start_date,
             end_date=input.end_date,
         )
-        return [OHLCVFetchResult(**{
-            "Date": str(item["Date"]),
-            "Open": item["Open"],
-            "High": item["High"],
-            "Low": item["Low"],
-            "Close": item["Close"],
-            "Volume": item["Volume"],
-        }) for item in data]
-        
+        return [
+            OHLCVFetchResult(
+                **{
+                    "Date": str(item["Date"]),
+                    "Open": item["Open"],
+                    "High": item["High"],
+                    "Low": item["Low"],
+                    "Close": item["Close"],
+                    "Volume": item["Volume"],
+                }
+            )
+            for item in data
+        ]
+
     @strawberry.field
     async def fetch_coin_list(self) -> CoinList:
         fetcher = CoinListFetcher()
         coins = await fetcher.fetch_coin_list()
         return CoinList(coins=coins)
+
+    @strawberry.field
+    async def fetch_backtest_history(
+        self, input: HistoricalDataInput
+    ) -> Optional[List[BacktestResult]]:
+        mapper = BacktestMapper()
+        db: AsyncIOMotorDatabase = get_database()
+        database = BacktestDatabase(db, mapper)
+        backtests = await database.list_backtests_for_user(input.user_id)
+        if not backtests:
+            return []
+        results = []
+        for bt in backtests:
+            strategy = (
+                MAStrategy(
+                    fast_ma_period=bt.strategy.fast_ma_period if bt.strategy else 20,
+                    slow_ma_period=bt.strategy.slow_ma_period if bt.strategy else 50,
+                )
+                if bt.strategy
+                else None
+            )
+            portfolios = [
+                PortfolioValue(Date=pv.Date, portfolio_value=pv.portfolio_value)
+                for pv in bt.data
+            ]
+            metrics = BacktestMetrics(
+                total_return=bt.metrics.total_return,
+                sharpe_ratio=bt.metrics.sharpe_ratio,
+                max_drawdown=bt.metrics.max_drawdown,
+                win_rate=bt.metrics.win_rate or 0.0,
+                strategy_name=bt.metrics.strategy_name,
+            )
+            result = BacktestResult(
+                id=str(bt.id),
+                symbol=bt.symbol,
+                status="success",
+                strategy=strategy,
+                data=portfolios,
+                metrics=metrics,
+                winning_trades=bt.winning_trades,
+                losing_trades=bt.losing_trades,
+                total_trades=bt.total_trades,
+                profit_factor=bt.profit_factor,
+                created_at=bt.created_at,
+                updated_at=bt.updated_at,
+            )
+
+            results.append(result)
+        return results
+
 
 @strawberry.type
 class Mutation:

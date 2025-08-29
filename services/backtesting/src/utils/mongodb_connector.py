@@ -6,7 +6,8 @@ import os
 
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-client = AsyncIOMotorClient(MONGO_URI, server_api=ServerApi('1'))
+client = AsyncIOMotorClient(MONGO_URI, server_api=ServerApi("1"))
+
 
 def get_database():
     """Returns the MongoDB database instance."""

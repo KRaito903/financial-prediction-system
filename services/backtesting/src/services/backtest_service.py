@@ -4,10 +4,10 @@ import backtrader as bt
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, TypeVar, Generic
-from ..models.backtest_model import BacktestPydanticResult
 
 # Set random seed for reproducibility
 np.random.seed(42)
+
 
 class TradingStrategy(ABC):
     """Base strategy interface following Interface Segregation Principle."""
@@ -94,6 +94,7 @@ class DataPreprocessor:
 
         return processed_data
 
+
 class BacktestResult(ABC):
     @abstractmethod
     def get_stats(self) -> Dict[str, Any]:
@@ -104,6 +105,7 @@ class BacktestResult(ABC):
     def get_portfolio(self) -> Any:
         """Return the raw portfolio object for custom analysis."""
         pass
+
 
 class VectorizedBacktestResult(BacktestResult):
     """Value object to store backtest results."""
@@ -134,12 +136,18 @@ class VectorizedBacktestResult(BacktestResult):
     def get_portfolio(self) -> vbt.Portfolio:
         """Return the raw portfolio object for custom analysis."""
         return self.portfolio
-    
+
     def get_portfolio_values(self) -> pd.DataFrame:
         """Return the portfolio values as a DataFrame."""
-        if(self.portfolio.value() is None):
-            return pd.DataFrame(columns=['date', 'value'])
-        return self.portfolio.value().to_frame(name='value').reset_index().rename(columns={'index': 'date'})
+        if self.portfolio.value() is None:
+            return pd.DataFrame(columns=["date", "value"])
+        return (
+            self.portfolio.value()
+            .to_frame(name="value")
+            .reset_index()
+            .rename(columns={"index": "date"})
+        )
+
 
 class EventDrivenBacktestResult(BacktestResult):
     """Value object to store event-driven backtest results."""
@@ -154,7 +162,7 @@ class EventDrivenBacktestResult(BacktestResult):
         """
         self.results = results
         self.strategy_name = strategy_name
-        
+
     def get_stats(self) -> Dict[str, Any]:
         """Return key performance statistics."""
         return {
@@ -169,16 +177,16 @@ class EventDrivenBacktestResult(BacktestResult):
     def get_portfolio(self) -> Dict[str, Any]:
         """Return the raw backtrader results for custom analysis."""
         return self.results
-    
+
     def get_portfolio_values(self) -> pd.DataFrame:
         """Return the portfolio values as a DataFrame."""
         # Backtrader does not provide time series portfolio values directly
         # This is a placeholder implementation
-        return pd.DataFrame(columns=['date', 'value'])
+        return pd.DataFrame(columns=["date", "value"])
 
 
 # Define a type variable for the result type
-T = TypeVar('T', bound=BacktestResult)
+T = TypeVar("T", bound=BacktestResult)
 
 
 class BacktestService(ABC, Generic[T]):
@@ -251,8 +259,10 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
 
         # Check sizing parameters
         if fixed_size is not None and percent_size is not None:
-            raise ValueError("Cannot use both fixed size and percent size sizers at the same time.")
-            
+            raise ValueError(
+                "Cannot use both fixed size and percent size sizers at the same time."
+            )
+
         # Create portfolio kwargs
         portfolio_kwargs = {
             "close": processed_data["Close"],
@@ -261,15 +271,15 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
             "freq": period,
             "init_cash": init_cash,
             "fees": fees,
-            "slippage": slippage
+            "slippage": slippage,
         }
-        
+
         # Add sizing parameter if provided
         if fixed_size is not None:
             portfolio_kwargs["size"] = fixed_size
         elif percent_size is not None:
             portfolio_kwargs["size"] = percent_size
-            
+
         # Create portfolio
         portfolio = vbt.Portfolio.from_signals(**portfolio_kwargs)
         return VectorizedBacktestResult(portfolio, strategy.get_strategy_name())
@@ -278,51 +288,55 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
 # Backtrader strategy that works with our TradingStrategy interface
 class BacktraderStrategyAdapter(bt.Strategy):
     """Adapter to use our TradingStrategy with Backtrader."""
-    
+
     params = (
-        ('trading_strategy', None),
-        ('data', None),
+        ("trading_strategy", None),
+        ("data", None),
     )
-    
+
     def __init__(self):
-        self.trading_strategy = getattr(self.params, 'trading_strategy', None)
-        self.data_feed = getattr(self.params, 'data', None)
+        self.trading_strategy = getattr(self.params, "trading_strategy", None)
+        self.data_feed = getattr(self.params, "data", None)
         self.order = None
-        
+
         # Generate signals using our trading strategy
         if self.trading_strategy and self.data_feed is not None:
-            self.entries, self.exits = self.trading_strategy.generate_signals(self.data_feed)
+            self.entries, self.exits = self.trading_strategy.generate_signals(
+                self.data_feed
+            )
             self.entry_idx = 0
             self.exit_idx = 0
         else:
             self.entries = pd.Series()
             self.exits = pd.Series()
-        
+
     def next(self):
         # Skip if we're out of signals
-        if (self.entry_idx >= len(self.entries) or 
-            self.exit_idx >= len(self.exits) or 
-            len(self.entries) == 0 or 
-            len(self.exits) == 0):
+        if (
+            self.entry_idx >= len(self.entries)
+            or self.exit_idx >= len(self.exits)
+            or len(self.entries) == 0
+            or len(self.exits) == 0
+        ):
             return
-        
+
         # Check if an order is pending
         if self.order:
             return
-            
+
         current_date = self.data.datetime.date()
-        
+
         # Check for entry signal
         if self.entry_idx < len(self.entries) and self.entries.iloc[self.entry_idx]:
             self.order = self.buy()
             print(f"BUY at {current_date}, price: {self.data.close[0]}")
-            
+
         # Check for exit signal
         elif self.exit_idx < len(self.exits) and self.exits.iloc[self.exit_idx]:
             if self.position:
                 self.order = self.sell()
                 print(f"SELL at {current_date}, price: {self.data.close[0]}")
-            
+
         # Update indices
         self.entry_idx += 1
         self.exit_idx += 1
@@ -366,10 +380,10 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
         # Set default strategy if none provided
         if strategy is None:
             strategy = CrossoverMAStrategy()
-            
+
         # Generate signals
         entries, exits = strategy.generate_signals(processed_data)
-        
+
         # If no signals and fallback enabled, try fallback strategy
         if use_fallback and (entries.sum() == 0 or exits.sum() == 0):
             print("No signals detected - using simple strategy as fallback")
@@ -379,44 +393,46 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
             print(
                 f"Fallback entry signals: {entries.sum()}, exit signals: {exits.sum()}"
             )
-            
+
         # Check sizing parameters
         if fixed_size is not None and percent_size is not None:
-            raise ValueError("Cannot use both fixed size and percent size sizers at the same time.")
+            raise ValueError(
+                "Cannot use both fixed size and percent size sizers at the same time."
+            )
 
         # Setup Cerebro engine
         cerebro = bt.Cerebro()
-        
+
         # Add our strategy wrapped in the adapter
-        cerebro.addstrategy(BacktraderStrategyAdapter, 
-                           trading_strategy=strategy,
-                           data=processed_data)
-        
+        cerebro.addstrategy(
+            BacktraderStrategyAdapter, trading_strategy=strategy, data=processed_data
+        )
+
         # Set broker parameters
         cerebro.broker.setcash(init_cash)
         cerebro.broker.setcommission(commission=fees)
         cerebro.broker.set_slippage_perc(slippage)
-        
+
         # Add sizing if provided
         if fixed_size is not None:
             cerebro.addsizer(bt.sizers.FixedSize, stake=fixed_size)
         elif percent_size is not None:
             cerebro.addsizer(bt.sizers.PercentSizer, percents=percent_size * 100)
-            
+
         # Add analyzers
-        cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
-        cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
-        cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
-        cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
-        cerebro.addanalyzer(bt.analyzers.SQN, _name='sqn')
+        cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name="sharpe")
+        cerebro.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
+        cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
+        cerebro.addanalyzer(bt.analyzers.Returns, _name="returns")
+        cerebro.addanalyzer(bt.analyzers.SQN, _name="sqn")
 
         # Create data feed from processed data
-        data_feed = bt.feeds.PandasData(dataname=processed_data) # type: ignore
+        data_feed = bt.feeds.PandasData(dataname=processed_data)  # type: ignore
         cerebro.adddata(data_feed)
 
         # Run the backtest
         results = cerebro.run()
-        
+
         if len(results) == 0:
             # No results, return default values
             return EventDrivenBacktestResult(
@@ -431,36 +447,36 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
                 },
                 strategy_name=strategy.get_strategy_name(),
             )
-        
+
         # Get the first strategy from results
         strat = results[0]
-        
+
         # Extract metrics from analyzers
         final_value = cerebro.broker.getvalue()
-        
+
         # Get metrics from analyzers if available
         sharpe = 0.0
-        if hasattr(strat.analyzers, 'sharpe'):
+        if hasattr(strat.analyzers, "sharpe"):
             sharpe_analyzer = strat.analyzers.sharpe.get_analysis()
-            if hasattr(sharpe_analyzer, 'sharperatio'):
+            if hasattr(sharpe_analyzer, "sharperatio"):
                 sharpe = sharpe_analyzer.sharperatio
-                
+
         drawdown = 0.0
-        if hasattr(strat.analyzers, 'drawdown'):
+        if hasattr(strat.analyzers, "drawdown"):
             dd_analyzer = strat.analyzers.drawdown.get_analysis()
-            if hasattr(dd_analyzer, 'max'):
+            if hasattr(dd_analyzer, "max"):
                 drawdown = dd_analyzer.max.drawdown
-        
+
         win_rate = 0.0
         total_trades = 0
-        if hasattr(strat.analyzers, 'trades'):
+        if hasattr(strat.analyzers, "trades"):
             trades_analyzer = strat.analyzers.trades.get_analysis()
-            total = trades_analyzer.get('total', {}).get('total', 0)
+            total = trades_analyzer.get("total", {}).get("total", 0)
             if total > 0:
-                won = trades_analyzer.get('won', {}).get('total', 0)
+                won = trades_analyzer.get("won", {}).get("total", 0)
                 win_rate = (won / total) * 100
             total_trades = total
-        
+
         # Create and return the result object
         return EventDrivenBacktestResult(
             results={
@@ -478,6 +494,7 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
 
 class BacktestServiceFactory:
     """Factory for creating backtest services."""
+
     @staticmethod
     def create_service(service_type: str) -> BacktestService:
         """Create a backtest service of the specified type."""

@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib
+
 matplotlib.use("TkAgg")  # Use the Tkinter GUI backend
 import matplotlib.pyplot as plt
 import os
@@ -8,7 +9,7 @@ from services.backtestService import (
     BacktestServiceFactory,
     CrossoverMAStrategy,
     VectorizedBacktestResult,
-    EventDrivenBacktestResult
+    EventDrivenBacktestResult,
 )
 
 # Load mock data
@@ -46,14 +47,14 @@ portfolio_value = portfolio.value()
 print("Vectorized Backtest Result:", portfolio_value)
 
 # Display results
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("VECTORIZED BACKTEST RESULTS")
-print("="*50)
+print("=" * 50)
 print(vectorized_result.get_stats())
 
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("EVENT-DRIVEN BACKTEST RESULTS")
-print("="*50)
+print("=" * 50)
 print(event_driven_result.get_stats())
 
 # Create a figure with two subplots for comparing results
@@ -74,35 +75,40 @@ if isinstance(event_driven_result, EventDrivenBacktestResult):
     # For event-driven, we need to extract and reconstruct the portfolio value
     results = event_driven_result.get_portfolio()
     plt.title("Event-Driven Backtest - Final Portfolio Value")
-    plt.bar(['Initial Value', 'Final Value'], 
-            [results.get('initial_value', 0), results.get('final_value', 0)],
-            color=['blue', 'green'])
-    plt.grid(True, axis='y')
+    plt.bar(
+        ["Initial Value", "Final Value"],
+        [results.get("initial_value", 0), results.get("final_value", 0)],
+        color=["blue", "green"],
+    )
+    plt.grid(True, axis="y")
     plt.ylabel("Value ($)")
 
 plt.tight_layout()
 plt.show()
 
 # Performance comparison table
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("PERFORMANCE COMPARISON")
-print("="*50)
+print("=" * 50)
 vec_stats = vectorized_result.get_stats()
 event_stats = event_driven_result.get_stats()
 
-comparison = pd.DataFrame({
-    'Vectorized': [
-        vec_stats.get('total_return', 0),
-        vec_stats.get('sharpe_ratio', 0),
-        vec_stats.get('max_drawdown', 0),
-        vec_stats.get('win_rate', 0)
-    ],
-    'Event-Driven': [
-        event_stats.get('total_return', 0),
-        event_stats.get('sharpe_ratio', 0),
-        event_stats.get('max_drawdown', 0),
-        event_stats.get('win_rate', 0)
-    ]
-}, index=['Total Return (%)', 'Sharpe Ratio', 'Max Drawdown (%)', 'Win Rate (%)'])
+comparison = pd.DataFrame(
+    {
+        "Vectorized": [
+            vec_stats.get("total_return", 0),
+            vec_stats.get("sharpe_ratio", 0),
+            vec_stats.get("max_drawdown", 0),
+            vec_stats.get("win_rate", 0),
+        ],
+        "Event-Driven": [
+            event_stats.get("total_return", 0),
+            event_stats.get("sharpe_ratio", 0),
+            event_stats.get("max_drawdown", 0),
+            event_stats.get("win_rate", 0),
+        ],
+    },
+    index=["Total Return (%)", "Sharpe Ratio", "Max Drawdown (%)", "Win Rate (%)"],
+)
 
 print(comparison)

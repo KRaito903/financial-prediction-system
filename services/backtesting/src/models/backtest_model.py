@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from bson import ObjectId
-from vectorbt import Trades
 
 
 class PyObjectId(ObjectId):
@@ -25,6 +24,34 @@ class PyObjectId(ObjectId):
         return field_schema
 
 
+# Pydantic equivalents for Strawberry types to match BacktestResult structure
+class MAStrategyPydantic(BaseModel):
+    fast_ma_period: int = Field(alias="fast")
+    slow_ma_period: int = Field(alias="slow")
+
+    class Config:
+        validate_by_name = True
+
+
+class PortfolioValuePydantic(BaseModel):
+    Date: str = Field(alias="date")
+    portfolio_value: float = Field(alias="value")
+
+    class Config:
+        validate_by_name = True
+
+
+class BacktestMetricsPydantic(BaseModel):
+    total_return: float = 0.0
+    sharpe_ratio: float = 0.0
+    max_drawdown: float = 0.0
+    win_rate: float = 0.0
+    profit_factor: float = 0.0
+    total_trades: Optional[int] = 0
+    winning_trades: Optional[int] = 0
+    losing_trades: Optional[int] = 0
+    strategy_name: str = "Moving Average Crossover"
+
 
 class BacktestPydanticResult(BaseModel):
     """
@@ -32,8 +59,8 @@ class BacktestPydanticResult(BaseModel):
 
     - `result` is a flexible dictionary accepting stats produced by either
     VectorizedBacktestResult.get_stats() or EventDrivenBacktestResult.get_stats().
-    - `portfolio_values` is optional and can store a time series (list of dicts
-    with date/value) produced by get_portfolio_values().
+    - `data` is optional and can store a time series (list of dicts
+    with Date/value) produced by get_portfolio_values().
     """
 
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
@@ -45,11 +72,11 @@ class BacktestPydanticResult(BaseModel):
     total_trades: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
-
-    # Flexible result field to accommodate either backtest result type
-    result: Dict[str, Any] = Field(default_factory=dict)
-    # Optionally store time-series portfolio values as list of {"date": ..., "value": ...}
-    portfolio_values: Optional[List[Dict[str, Any]]] = None
+    profit_factor: Optional[float] = None
+    status: str = "success"
+    # Optionally store time-series portfolio values as list of {"Date": ..., "portfolio_value": ...}
+    data: Optional[List[Dict[str, Any]]] = None
+    metrics: Dict[str, Any] = Field(default_factory=dict)
 
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -60,37 +87,31 @@ class BacktestPydanticResult(BaseModel):
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
+
 class BacktestResponse(BaseModel):
     """
-    Response model returned by the API. `result` mirrors the flexible stats dict
-    from the backtest implementations. `win_rate` is preserved for convenience,
-    but if missing the client can use `result.get('win_rate')`.
+    Response model returned by the API, now aligned with BacktestResult structure.
+    Includes core fields like status, strategy, data, and metrics for consistency.
     """
 
     id: str
     symbol: str
-    strategy: Dict[str, Any]
-    trades: List[Dict[str, Any]] = []
-    total_return: Optional[float]
-    total_trades: int
-    winning_trades: int
-    losing_trades: int
-    win_rate: Optional[float] = None  # Calculated field (kept for compatibility)
-    result: Optional[Dict[str, Any]] = None
-    portfolio_values: Optional[List[Dict[str, Any]]] = None
+    status: str = "success"  # Default status for completed backtests
+    strategy: Optional[MAStrategyPydantic] = None
+    winning_trades: int = 0
+    losing_trades: int = 0
+    total_trades: int = 0
+    profit_factor: Optional[float] = None
+    data: List[PortfolioValuePydantic] = []
+    metrics: BacktestMetricsPydantic = BacktestMetricsPydantic()
     created_at: datetime
     updated_at: datetime
+    total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    profit_factor: Optional[float] = None
 
-    @property
-    def win_rate_calc(self) -> Optional[float]:
-        """Calculate win rate; fallback to `result['win_rate']` if available."""
-        if self.total_trades > 0:
-            return (self.winning_trades / self.total_trades) * 100
-        if self.result:
-            try:
-                val = self.result.get("win_rate")
-                if val is not None:
-                    return float(val)
-            except Exception:
-                pass
-        return
+    class Config:
+        validate_by_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}

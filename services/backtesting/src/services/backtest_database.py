@@ -26,6 +26,7 @@ class DocumentMapper(Protocol):
         """Protocol for a document mapper. Defines the interface for a class responsible for mapping raw MongoDB documents to Pydantic models."""
         return BacktestResponse(**doc)
 
+
 class BacktestMapper:
     def _doc_to_response(self, doc: dict) -> BacktestResponse:
         """Map a raw Mongo document to the BacktestResponse Pydantic model."""
@@ -34,21 +35,20 @@ class BacktestMapper:
 
         resp = {
             "id": str(doc.get("_id")),
-            "name": doc.get("name"),
             "symbol": doc.get("symbol"),
+            "status": doc.get("status", "success"),
             "strategy": doc.get("strategy"),
-            "trades": doc.get("trades", []),
-            "total_return": doc.get("total_return"),
+            "data": doc.get("data", []),
+            "metrics": doc.get("metrics", {}),
+            "created_at": doc.get("created_at"),
+            "updated_at": doc.get("updated_at"),
             "total_trades": doc.get("total_trades", 0),
             "winning_trades": doc.get("winning_trades", 0),
             "losing_trades": doc.get("losing_trades", 0),
-            "win_rate": doc.get("result", {}).get("win_rate"),
-            "result": doc.get("result", {}),
-            "portfolio_values": doc.get("portfolio_values"),
-            "created_at": doc.get("created_at"),
-            "updated_at": doc.get("updated_at"),
+            "profit_factor": doc.get("profit_factor"),
         }
         return BacktestResponse(**resp)
+
 
 # Database access layer for Backtest results
 # Responsibility: CRUD operations for Backtest results in MongoDB
@@ -74,8 +74,7 @@ class BacktestDatabase:
         # Do not trust client-supplied _id - let Mongo generate one
         doc.pop("_id", None)
 
-        # Attach/normalize user_id (store as ObjectId when possible)
-        doc["user_id"] = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
+        doc["user_id"] = str(user_id)
 
         now = datetime.utcnow()
         doc.setdefault("created_at", now)
@@ -99,12 +98,10 @@ class BacktestDatabase:
         if not ObjectId.is_valid(id):
             return False
 
-        query = {"_id": ObjectId(id)}
+        query = {}
+        query["_id"] = ObjectId(id)
         if user_id:
-            # ensure provided user_id is a valid ObjectId before using it in the query
-            if not ObjectId.is_valid(user_id):
-                return False
-            query["user_id"] = ObjectId(user_id)
+            query["user_id"] = user_id
 
         delete_result = await self.collection.delete_one(query)
         return delete_result.deleted_count > 0
@@ -118,37 +115,27 @@ class BacktestDatabase:
         """
         if not ObjectId.is_valid(id):
             return None
-
-        query = {"_id": ObjectId(id)}
+        query = {}
+        query["_id"] = ObjectId(id)
         if user_id:
             # ensure provided user_id is a valid ObjectId before using it in the query
-            if not ObjectId.is_valid(user_id):
-                return None
-            query["user_id"] = ObjectId(user_id)
+            query["user_id"] = user_id
+            query["user_id"] = user_id
 
         doc = await self.collection.find_one(query)
         if not doc:
             return None
         return self.mapper._doc_to_response(doc)
 
-    async def list_backtests_for_user(
-        self, user_id: str, limit: int = 50, startIdx: int = 0
-    ) -> List[BacktestResponse]:
+    async def list_backtests_for_user(self, user_id: str) -> List[BacktestResponse]:
         """
-        Return all backtests of a specific user.
+        List all backtests for a given user_id, sorted by creation date descending.
+        Returns a list of BacktestResponse instances.
         """
-        # validate user_id and query using an ObjectId to match stored type
-        if not ObjectId.is_valid(user_id):
-            return []
-        cursor = self.collection.find({"user_id": ObjectId(user_id)}).sort(
+        cursor = self.collection.find({"user_id": user_id}).sort(
             "created_at", DESCENDING
         )
-        if startIdx:
-            cursor = cursor.skip(startIdx)
-        if limit:
-            cursor = cursor.limit(limit)
-        docs = await cursor.to_list(
-            length=limit or 100
-        )  # default max length if limit is None/0
-        result = [self.mapper._doc_to_response(doc) for doc in docs]
-        return result
+        results = []
+        async for doc in cursor:
+            results.append(self.mapper._doc_to_response(doc))
+        return results

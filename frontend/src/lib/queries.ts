@@ -48,6 +48,36 @@ export const FETCH_TRADING_PAIRS = gql`
 	}
 `;
 
+export const FETCH_BACKTEST_HISTORY = gql`
+    query FetchBacktestHistory($input: HistoricalDataInput!) {
+        fetchBacktestHistory(input: $input) {
+            id
+            symbol
+            status
+            strategy {
+                fastMaPeriod
+                slowMaPeriod
+            }
+            profitFactor
+            totalTrades
+            winningTrades
+            losingTrades
+            metrics {
+                totalReturn
+                sharpeRatio
+                maxDrawdown
+                winRate
+            }
+            data {
+                Date
+                portfolioValue
+            }
+            createdAt
+            updatedAt
+        }
+    }
+`;
+
 export const RUN_VECTORIZED_BACKTEST = gql`
 	mutation RunVectorizedBacktest($input: BacktestInput!) {
 		runVectorizedBacktest(input: $input) {
@@ -56,15 +86,15 @@ export const RUN_VECTORIZED_BACKTEST = gql`
 				fastMaPeriod
 				slowMaPeriod
 			}
+			profitFactor
+			totalTrades
+			winningTrades
+			losingTrades
 			metrics {
 				totalReturn
 				sharpeRatio
 				maxDrawdown
 				winRate
-				profitFactor
-				totalTrades
-				winningTrades
-				losingTrades
 			}
 			data {
 				Date
@@ -82,15 +112,15 @@ export const RUN_EVENT_DRIVEN_BACKTEST = gql`
 				fastMaPeriod
 				slowMaPeriod
 			}
+			profitFactor
+			totalTrades
+			winningTrades
+			losingTrades
 			metrics {
 				totalReturn
 				sharpeRatio
 				maxDrawdown
 				winRate
-				profitFactor
-				totalTrades
-				winningTrades
-				losingTrades
 			}
 			data {
 				Date
