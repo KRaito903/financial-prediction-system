@@ -35,6 +35,27 @@ services:
         /opt/kafka/bin/kafka-topics.sh --create --topic sentiment_news_responses --bootstrap-server kafka:9092 &&
         echo 'Topics created successfully.'
       "
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: frontend
+    ports:
+      - "3000:5173"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - apollo-service-router
+    develop:
+      watch:
+        - path: ./frontend/package.json
+          action: rebuild
+        - path: ./frontend/
+          action: sync
+          target: /usr/src/app
+          ignore:
+            - node_modules/
 
   users-service:
     build:
