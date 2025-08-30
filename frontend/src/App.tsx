@@ -5,18 +5,18 @@ import {
 	Navigate,
 } from "react-router-dom";
 import { ApolloProvider } from "@apollo/client";
-import { backtestClient } from "./lib/apollo-client";
-import { AuthProvider } from "./context/AuthContext";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Dashboard from "./components/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BacktestPage from "./route/backtest/page";
 import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "./context/AuthContext";
+import { client } from "./lib/apollo-client";
 
 function App() {
 	return (
-		<ApolloProvider client={backtestClient}>
+		<ApolloProvider client={client}>
 			<AuthProvider>
 				<Router>
 					<Routes>
@@ -30,7 +30,14 @@ function App() {
 								</ProtectedRoute>
 							}
 						/>
-						<Route path="/backtest" element={<BacktestPage />} />
+						<Route
+							path="/backtest"
+							element={
+								<ProtectedRoute>
+									<BacktestPage />
+								</ProtectedRoute>
+							}
+						/>
 						<Route
 							path="/"
 							element={<Navigate to="/login" replace />}

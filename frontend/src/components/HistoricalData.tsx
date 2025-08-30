@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { FETCH_BACKTEST_HISTORY } from "@/lib/queries";
 import { format } from "date-fns";
+import { useAuth } from "@/context/AuthContext";
 
 interface HistoricalBacktest {
 	id: string;
@@ -42,7 +43,7 @@ const HistoricalData: React.FC<HistoricalDataProps> = ({
 	const { data, loading, error } = useQuery(FETCH_BACKTEST_HISTORY, {
 		variables: {
 			input: {
-				userId: "test-user", // TODO: replace with actual user ID from auth context
+				userId: useAuth().user?.id || "test-user"
 			},
 		},
 		skip: !isOpen, // Only fetch when panel is open
