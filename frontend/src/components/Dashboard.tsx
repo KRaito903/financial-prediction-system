@@ -11,6 +11,10 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
+  const handleNavigateToBacktest = () => {
+    navigate('/backtest');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow">
@@ -57,6 +61,13 @@ const Dashboard: React.FC = () => {
                   <p><span className="font-medium">Email:</span> {user?.email}</p>
                 </div>
               </div>
+              
+              <button
+                onClick={handleNavigateToBacktest}
+                className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+              >
+                Go to Backtest
+              </button>
               
               <p className="text-sm text-gray-500 mt-6">
                 Financial prediction features coming soon...

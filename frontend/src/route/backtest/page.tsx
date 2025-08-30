@@ -53,6 +53,7 @@ import toast from "react-hot-toast";
 import BacktestChart from "../../components/BacktestChart";
 import BacktestMetricsComponent from "../../components/BacktestMetrics";
 import HistoricalData from "../../components/HistoricalData";
+import { useAuth } from "@/context/AuthContext";
 
 interface HistoricalBacktest {
 	id: string;
@@ -189,7 +190,7 @@ const BacktestPage: React.FC = () => {
 
 	const form = useForm<BacktestFormData>({
 		defaultValues: {
-			userId: "test-user", // TODO: replace with actual user ID from auth context
+			userId: useAuth().user?.id || "test-user",
 			symbol: "BTCUSDT",
 			fetchInput: {
 				startDate: format(

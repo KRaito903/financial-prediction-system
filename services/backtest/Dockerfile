@@ -21,10 +21,9 @@ ENV NUMBA_DISABLE_JIT=0
 # Create Numba cache directory with proper permissions
 RUN mkdir -p /tmp/numba_cache && chmod 755 /tmp/numba_cache
 
-# Copy and install lean requirements
+# Copy and install requirements using pip
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-compile Numba functions to avoid runtime compilation issues
 # This step forces vectorbt to compile its Numba functions during build
@@ -67,7 +66,7 @@ EXPOSE 5050
 
 # Health check with better error handling
 # Updated to handle potential connection issues more gracefully
-HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:5050/health', timeout=10)" || exit 1
 
 # Default command to run the application
