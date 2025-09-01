@@ -1,52 +1,52 @@
 import React, { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@apollo/client";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
 } from "@/components/ui/form";
 import { Calendar } from "@/components/ui/calendar";
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from "@/components/ui/command";
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import {
-	RUN_VECTORIZED_BACKTEST,
-	RUN_EVENT_DRIVEN_BACKTEST,
-	FETCH_TRADING_PAIRS,
-	RUN_ML_BACKTEST,
+    RUN_VECTORIZED_BACKTEST,
+    RUN_EVENT_DRIVEN_BACKTEST,
+    FETCH_TRADING_PAIRS,
+    RUN_ML_BACKTEST,
 } from "@/lib/queries";
 import { ModelManager } from "@/components/ModelManager";
 import { format, toDate } from "date-fns";
@@ -140,7 +140,7 @@ const BacktestPage: React.FC = () => {
 	>("vectorized");
 	const [result, setResult] = useState<BacktestResult | null>(null);
 	const [loading, setLoading] = useState(false);
-	const [initCashValue, setInitCashValue] = useState(10000); // Store initCash for chart use
+	const [initCashValue, setInitCashValue] = useState(10000);
 	const [coinList, setCoinList] = useState<string[]>([]);
 	const [selectedHistoricalBacktest, setSelectedHistoricalBacktest] =
 		useState<BacktestResult | null>(null);
@@ -159,10 +159,10 @@ const BacktestPage: React.FC = () => {
 	} = useQuery(FETCH_TRADING_PAIRS);
 
 	useEffect(() => {
-		if (queryLoading) return; // Wait for loading to finish
+		if (queryLoading) return;
 		if (data?.fetchCoinList?.coins) {
-			const coins = [...data.fetchCoinList.coins]; // Create a copy to avoid mutating the original
-			setCoinList(coins.sort()); // Sort the copy and set state
+			const coins = [...data.fetchCoinList.coins];
+			setCoinList(coins.sort());
 			toast.success("Trading pairs fetched successfully!");
 		} else if (queryError) {
 			console.error("Error fetching trading pairs:", queryError);
@@ -225,9 +225,34 @@ const BacktestPage: React.FC = () => {
 		},
 	});
 
+	const getErrorMessage = (error: any): string => {
+		const errorMessage = error?.message || String(error);
+
+		// Check for Binance API timeout or connection errors
+		if (
+			errorMessage.toLowerCase().includes("timeout") ||
+			errorMessage.toLowerCase().includes("connection") ||
+			errorMessage.toLowerCase().includes("network") ||
+			errorMessage.toLowerCase().includes("binance")
+		) {
+			return "Binance API connection timeout. Please try again with a smaller date range or check your internet connection.";
+		}
+
+		// Check for other common API errors
+		if (errorMessage.toLowerCase().includes("rate limit")) {
+			return "API rate limit exceeded. Please wait a moment and try again.";
+		}
+
+		if (errorMessage.toLowerCase().includes("invalid symbol")) {
+			return "Invalid trading symbol. Please select a different symbol.";
+		}
+
+		return errorMessage;
+	};
+
 	const onSubmit = async (data: BacktestFormData) => {
 		setLoading(true);
-		setInitCashValue(data.initCash); // Update initCash for chart
+		setInitCashValue(data.initCash);
 		const toastId = toast.loading("Running Backtest...");
 
 		// Validate model selection for custom-model backtest
@@ -324,10 +349,13 @@ const BacktestPage: React.FC = () => {
 		} catch (error) {
 			console.error("Backtest error:", error);
 			toast.dismiss(toastId);
+			const errorMessage = getErrorMessage(error);
 			toast.error(
-				`Backtest error: ${
-					error instanceof Error ? error.message : String(error)
-				}`
+				`Backtest failed: ${errorMessage}`,
+				{
+					duration: 5000,
+					icon: <AlertTriangle className="h-4 w-4" />,
+				}
 			);
 		} finally {
 			setLoading(false);
@@ -899,37 +927,39 @@ const BacktestPage: React.FC = () => {
 										<Label>Model Selection</Label>
 										<p className="text-sm text-muted-foreground">
 											Select a model and scaler from your
-											uploaded files below
+											uploaded files below. Click on the files to select them.
 										</p>
-										<div className="space-y-1">
-											{selectedModelFilename ? (
-												<p className="text-sm text-green-600">
-													Selected model:{" "}
-													{selectedModelFilename}
-												</p>
-											) : (
-												<p className="text-sm text-gray-600">
-													No model selected
-												</p>
-											)}
-											{selectedScalerFilename ? (
-												<p className="text-sm text-green-600">
-													Selected scaler:{" "}
-													{selectedScalerFilename}
-												</p>
-											) : (
-												<p className="text-sm text-gray-600">
-													No scaler selected
-												</p>
-											)}
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+											<div className="space-y-1">
+												<Label className="text-sm font-medium">Selected Model:</Label>
+												{selectedModelFilename ? (
+													<p className="text-sm text-green-600 font-medium">
+														✓ {selectedModelFilename}
+													</p>
+												) : (
+													<p className="text-sm text-red-600">
+														⚠ No model selected
+													</p>
+												)}
+											</div>
+											<div className="space-y-1">
+												<Label className="text-sm font-medium">Selected Scaler:</Label>
+												{selectedScalerFilename ? (
+													<p className="text-sm text-green-600 font-medium">
+														✓ {selectedScalerFilename}
+													</p>
+												) : (
+													<p className="text-sm text-red-600">
+														⚠ No scaler selected
+													</p>
+												)}
+											</div>
 										</div>
 									</div>
 									<ModelManager
 										onModelSelect={setSelectedModelFilename}
 										selectedModel={selectedModelFilename}
-										onScalerSelect={
-											setSelectedScalerFilename
-										}
+										onScalerSelect={setSelectedScalerFilename}
 										selectedScaler={selectedScalerFilename}
 									/>
 								</div>

@@ -212,14 +212,22 @@ export const ModelManager: React.FC<ModelManagerProps> = ({
           <div className="space-y-2">
             {models.map((model) => {
               const isScaler = model.filename.toLowerCase().includes("scaler");
+              const isSelected = (selectedModel === model.filename && !isScaler) || 
+                                (selectedScaler === model.filename && isScaler);
+              
               return (
                 <div
                   key={model.filename}
-                  className={`flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors ${
-                    (selectedModel === model.filename && !isScaler) || 
-                    (selectedScaler === model.filename && isScaler) 
-                      ? "bg-muted border-primary" : ""
+                  className={`flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer ${
+                    isSelected ? "bg-muted border-primary" : ""
                   }`}
+                  onClick={() => {
+                    if (isScaler && onScalerSelect) {
+                      onScalerSelect(selectedScaler === model.filename ? "" : model.filename);
+                    } else if (!isScaler && onModelSelect) {
+                      onModelSelect(selectedModel === model.filename ? "" : model.filename);
+                    }
+                  }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -229,27 +237,10 @@ export const ModelManager: React.FC<ModelManagerProps> = ({
                       }`}>
                         {isScaler ? "Scaler" : "Model"}
                       </span>
-                      {(onModelSelect || onScalerSelect) && (
-                        <div className="flex gap-1">
-                          {!isScaler && onModelSelect && (
-                            <Button
-                              variant={selectedModel === model.filename ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => onModelSelect(model.filename)}
-                            >
-                              {selectedModel === model.filename ? "Selected as Model" : "Select as Model"}
-                            </Button>
-                          )}
-                          {isScaler && onScalerSelect && (
-                            <Button
-                              variant={selectedScaler === model.filename ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => onScalerSelect(model.filename)}
-                            >
-                              {selectedScaler === model.filename ? "Selected as Scaler" : "Select as Scaler"}
-                            </Button>
-                          )}
-                        </div>
+                      {isSelected && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-primary text-primary-foreground">
+                          Selected
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
@@ -261,7 +252,10 @@ export const ModelManager: React.FC<ModelManagerProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(model.filename)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(model.filename);
+                      }}
                       disabled={loading}
                     >
                       <Trash2 className="h-4 w-4" />
