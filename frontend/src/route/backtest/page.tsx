@@ -46,7 +46,9 @@ import {
 	RUN_VECTORIZED_BACKTEST,
 	RUN_EVENT_DRIVEN_BACKTEST,
 	FETCH_TRADING_PAIRS,
+	RUN_ML_BACKTEST,
 } from "@/lib/queries";
+import { ModelManager } from "@/components/ModelManager";
 import { format, toDate } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import toast from "react-hot-toast";
@@ -63,10 +65,10 @@ interface HistoricalBacktest {
 		fastMaPeriod: number;
 		slowMaPeriod: number;
 	};
-    profitFactor: number;
-    totalTrades?: number;
-    winningTrades?: number;
-    losingTrades?: number;
+	profitFactor: number;
+	totalTrades?: number;
+	winningTrades?: number;
+	losingTrades?: number;
 	metrics: {
 		totalReturn: number;
 		sharpeRatio: number;
@@ -76,6 +78,7 @@ interface HistoricalBacktest {
 	data: Array<{
 		Date: string;
 		portfolioValue: number;
+		signal?: string;
 	}>;
 	createdAt: string;
 	updatedAt: string;
@@ -107,6 +110,7 @@ interface BacktestFormData {
 interface PortfolioValue {
 	Date: string;
 	portfolioValue: number;
+	signal?: string;
 }
 
 interface BacktestMetrics {
@@ -132,16 +136,22 @@ interface BacktestResult {
 
 const BacktestPage: React.FC = () => {
 	const [backtestType, setBacktestType] = useState<
-		"vectorized" | "event-driven"
+		"vectorized" | "event-driven" | "custom-model"
 	>("vectorized");
 	const [result, setResult] = useState<BacktestResult | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [initCashValue, setInitCashValue] = useState(10000); // Store initCash for chart use
 	const [coinList, setCoinList] = useState<string[]>([]);
-	const [selectedHistoricalBacktest, setSelectedHistoricalBacktest] = useState<BacktestResult | null>(null);
+	const [selectedHistoricalBacktest, setSelectedHistoricalBacktest] =
+		useState<BacktestResult | null>(null);
+	const [selectedModelFilename, setSelectedModelFilename] =
+		useState<string>("");
+	const [selectedScalerFilename, setSelectedScalerFilename] =
+		useState<string>("");
 
 	const [runVectorizedBacktest] = useMutation(RUN_VECTORIZED_BACKTEST);
 	const [runEventDrivenBacktest] = useMutation(RUN_EVENT_DRIVEN_BACKTEST);
+	const [runMlBacktest] = useMutation(RUN_ML_BACKTEST);
 	const {
 		data,
 		loading: queryLoading,
@@ -164,13 +174,16 @@ const BacktestPage: React.FC = () => {
 		// Transform the historical backtest data to match BacktestResult interface
 		const transformedBacktest: BacktestResult = {
 			status: backtest.status,
-			strategy: backtest.strategy ? {
-				fastMaPeriod: backtest.strategy.fastMaPeriod,
-				slowMaPeriod: backtest.strategy.slowMaPeriod,
-			} : undefined,
+			strategy: backtest.strategy
+				? {
+						fastMaPeriod: backtest.strategy.fastMaPeriod,
+						slowMaPeriod: backtest.strategy.slowMaPeriod,
+				  }
+				: undefined,
 			data: backtest.data.map((item) => ({
 				Date: item.Date,
 				portfolioValue: item.portfolioValue,
+				signal: item.signal || "hold", // Provide fallback
 			})),
 			profitFactor: backtest.profitFactor,
 			totalTrades: backtest.totalTrades || 0,
@@ -216,6 +229,27 @@ const BacktestPage: React.FC = () => {
 		setLoading(true);
 		setInitCashValue(data.initCash); // Update initCash for chart
 		const toastId = toast.loading("Running Backtest...");
+
+		// Validate model selection for custom-model backtest
+		if (backtestType === "custom-model") {
+			if (!selectedModelFilename) {
+				toast.dismiss(toastId);
+				toast.error(
+					"Please select a model from the Model Manager for custom model backtest"
+				);
+				setLoading(false);
+				return;
+			}
+			if (!selectedScalerFilename) {
+				toast.dismiss(toastId);
+				toast.error(
+					"Please select a scaler file from the Model Manager for custom model backtest"
+				);
+				setLoading(false);
+				return;
+			}
+		}
+
 		try {
 			const input = {
 				userId: data.userId,
@@ -253,6 +287,14 @@ const BacktestPage: React.FC = () => {
 				fixedSize: data.fixedSize || null,
 				percentSize: data.percentSize || null,
 				useFallback: data.useFallback,
+				modelFile:
+					backtestType === "custom-model"
+						? selectedModelFilename
+						: undefined,
+				modelScalerFile:
+					backtestType === "custom-model"
+						? selectedScalerFilename
+						: undefined,
 			};
 
 			let response;
@@ -260,17 +302,21 @@ const BacktestPage: React.FC = () => {
 				response = await runVectorizedBacktest({
 					variables: { input },
 				});
-			} else {
+			} else if (backtestType === "event-driven") {
 				response = await runEventDrivenBacktest({
 					variables: { input },
 				});
+			} else if (backtestType === "custom-model") {
+				response = await runMlBacktest({ variables: { input } });
 			}
 
-			if (response.data) {
+			if (response?.data) {
 				const resultKey =
 					backtestType === "vectorized"
 						? "runVectorizedBacktest"
-						: "runEventDrivenBacktest";
+						: backtestType === "event-driven"
+						? "runEventDrivenBacktest"
+						: "runMlBacktest";
 				setResult(response.data[resultKey]);
 				toast.dismiss(toastId);
 				toast.success("Backtest completed successfully!");
@@ -310,7 +356,10 @@ const BacktestPage: React.FC = () => {
 									<Label>Backtest Type</Label>
 									<Select
 										onValueChange={(
-											value: "vectorized" | "event-driven"
+											value:
+												| "vectorized"
+												| "event-driven"
+												| "custom-model"
 										) => setBacktestType(value)}
 										defaultValue={backtestType}
 									>
@@ -323,6 +372,9 @@ const BacktestPage: React.FC = () => {
 											</SelectItem>
 											<SelectItem value="event-driven">
 												Event-Driven Backtest
+											</SelectItem>
+											<SelectItem value="custom-model">
+												Custom Model Backtest
 											</SelectItem>
 										</SelectContent>
 									</Select>
@@ -841,6 +893,48 @@ const BacktestPage: React.FC = () => {
 								/>
 							</div>
 
+							{backtestType === "custom-model" && (
+								<div className="space-y-4">
+									<div className="space-y-2">
+										<Label>Model Selection</Label>
+										<p className="text-sm text-muted-foreground">
+											Select a model and scaler from your
+											uploaded files below
+										</p>
+										<div className="space-y-1">
+											{selectedModelFilename ? (
+												<p className="text-sm text-green-600">
+													Selected model:{" "}
+													{selectedModelFilename}
+												</p>
+											) : (
+												<p className="text-sm text-gray-600">
+													No model selected
+												</p>
+											)}
+											{selectedScalerFilename ? (
+												<p className="text-sm text-green-600">
+													Selected scaler:{" "}
+													{selectedScalerFilename}
+												</p>
+											) : (
+												<p className="text-sm text-gray-600">
+													No scaler selected
+												</p>
+											)}
+										</div>
+									</div>
+									<ModelManager
+										onModelSelect={setSelectedModelFilename}
+										selectedModel={selectedModelFilename}
+										onScalerSelect={
+											setSelectedScalerFilename
+										}
+										selectedScaler={selectedScalerFilename}
+									/>
+								</div>
+							)}
+
 							<Button
 								type="submit"
 								disabled={loading}
@@ -869,7 +963,9 @@ const BacktestPage: React.FC = () => {
 			{selectedHistoricalBacktest && !result && (
 				<div className="space-y-6">
 					<div className="flex items-center justify-between">
-						<h3 className="text-lg font-semibold">Historical Backtest Results</h3>
+						<h3 className="text-lg font-semibold">
+							Historical Backtest Results
+						</h3>
 						<Button
 							variant="outline"
 							size="sm"
@@ -878,7 +974,9 @@ const BacktestPage: React.FC = () => {
 							Clear Selection
 						</Button>
 					</div>
-					<BacktestMetricsComponent result={selectedHistoricalBacktest} />
+					<BacktestMetricsComponent
+						result={selectedHistoricalBacktest}
+					/>
 					<BacktestChart
 						result={selectedHistoricalBacktest}
 						backtestType="vectorized" // Default to vectorized for historical data

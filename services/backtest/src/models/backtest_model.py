@@ -36,6 +36,7 @@ class MAStrategyPydantic(BaseModel):
 class PortfolioValuePydantic(BaseModel):
     Date: str = Field(alias="date")
     portfolio_value: float = Field(alias="value")
+    signal: str = Field(default="hold")
 
     class Config:
         validate_by_name = True
@@ -60,7 +61,7 @@ class BacktestPydanticResult(BaseModel):
     - `result` is a flexible dictionary accepting stats produced by either
     VectorizedBacktestResult.get_stats() or EventDrivenBacktestResult.get_stats().
     - `data` is optional and can store a time series (list of dicts
-    with Date/value) produced by get_portfolio_values().
+    with date/value) produced by get_portfolio_values().
     """
 
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")

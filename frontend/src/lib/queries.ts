@@ -71,6 +71,7 @@ export const FETCH_BACKTEST_HISTORY = gql`
             data {
                 Date
                 portfolioValue
+								signal
             }
             createdAt
             updatedAt
@@ -99,6 +100,7 @@ export const RUN_VECTORIZED_BACKTEST = gql`
 			data {
 				Date
 				portfolioValue
+				signal
 			}
 		}
 	}
@@ -128,4 +130,27 @@ export const RUN_EVENT_DRIVEN_BACKTEST = gql`
 			}
 		}
 	}
+`;
+
+export const RUN_ML_BACKTEST = gql`
+  mutation RunMlBacktest($input: BacktestInput!) {
+    runMlBacktest(input: $input) {
+      status
+      profitFactor
+      totalTrades
+      winningTrades
+      losingTrades
+      metrics {
+        totalReturn
+        sharpeRatio
+        maxDrawdown
+        winRate
+      }
+      data {
+        Date
+        portfolioValue
+        signal
+      }
+    }
+  }
 `;

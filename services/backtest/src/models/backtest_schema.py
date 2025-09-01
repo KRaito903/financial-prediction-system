@@ -1,26 +1,23 @@
 import strawberry
 from typing import List, Optional, Dict, Any
+import pandas as pd
 from ..services.backtest_service import (
     BacktestServiceFactory,
     CrossoverMAStrategy,
 )
-import pandas as pd
 from ..utils.mongodb_connector import get_database
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..models.backtest_model import BacktestPydanticResult
 from ..services.backtest_database import BacktestDatabase, BacktestMapper
 from ..utils.OHLCV_fetcher import BinanceOHLCV
 from ..utils.coint_list_fetcher import CoinListFetcher
+from ..utils.uploader import uploader
 import datetime
+from ..services.backtest_service import MLTradingStrategy
+
 
 
 # Input types
-@strawberry.input
-class MACrossoverParamsInput:
-    fast: int = 20
-    slow: int = 50
-
-
 @strawberry.input
 class OHLCVFetchInput:
     symbol: str
@@ -31,11 +28,19 @@ class OHLCVFetchInput:
 
 
 @strawberry.input
+class MACrossoverParamsInput:
+    fast: int = 20
+    slow: int = 50
+
+
+@strawberry.input
 class BacktestInput:
     user_id: str
     symbol: str
     fetch_input: OHLCVFetchInput
     maCrossoverParams: Optional[MACrossoverParamsInput] = None
+    modelFile: str
+    modelScalerFile: Optional[str] = None
     period: str = "1D"
     initCash: float = 10000.0
     fees: float = 0.001
@@ -46,8 +51,33 @@ class BacktestInput:
 
 
 @strawberry.input
+class MLBacktestInput:
+    user_id: str
+    symbol: str
+    fetch_input: OHLCVFetchInput
+    threshold: float = 0.5
+    feature_columns: Optional[List[str]] = None
+    period: str = "1D"
+    initCash: float = 10000.0
+    fees: float = 0.001
+    slippage: float = 0.001
+    fixedSize: Optional[bool] = None
+    percentSize: Optional[float] = None
+
+
+@strawberry.input
 class HistoricalDataInput:
     user_id: str
+
+
+@strawberry.type
+class ModelInfo:
+    filename: str
+    file_path: str
+    relative_path: str
+    file_size: int
+    created_time: float
+    modified_time: float
 
 
 # Output types
@@ -79,6 +109,7 @@ class BacktestMetrics:
 class PortfolioValue:
     Date: str
     portfolio_value: float
+    signal: str = "hold"
 
 
 # Add an explicit Strawberry type for the MA strategy so Strawberry can resolve fields
@@ -167,8 +198,16 @@ async def fetch_ohlcv_data(
 async def run_and_save_backtest(
     service_type: str, input: BacktestInput
 ) -> BacktestResult:
-    # This is the unified function that both mutations will call
-    service = BacktestServiceFactory.create_service(service_type)
+    """Unified function for running and saving both regular and ML backtests."""
+
+    # Determine if this is an ML backtest
+    is_ml_backtest = input.modelFile is not None
+
+    # Create appropriate service
+    if is_ml_backtest:
+        service = BacktestServiceFactory.create_service("ml")
+    else:
+        service = BacktestServiceFactory.create_service(service_type)
 
     # Always fetch OHLCV data
     fetched_data = await fetch_ohlcv_data(
@@ -178,6 +217,7 @@ async def run_and_save_backtest(
         start_date=input.fetch_input.start_date,
         end_date=input.fetch_input.end_date,
     )
+
     # Transform fetched data to DataFrame
     data_dict_list = [
         {
@@ -193,41 +233,126 @@ async def run_and_save_backtest(
     data = pd.DataFrame(data_dict_list)
     data["Date"] = pd.to_datetime(data["Date"])
     data.set_index("Date", inplace=True)
-    ma_params = {
-        "fast_ma_period": (
-            input.maCrossoverParams.fast if input.maCrossoverParams else 20
-        ),
-        "slow_ma_period": (
-            input.maCrossoverParams.slow if input.maCrossoverParams else 50
-        ),
-    }
-    strategy = CrossoverMAStrategy(**ma_params)
-    backtest_params = {
-        "data": data,
-        "strategy": strategy,
-        "period": input.period,
-        "init_cash": input.initCash,
-        "fees": input.fees,
-        "slippage": input.slippage,
-        "fixed_size": input.fixedSize,
-        "percent_size": input.percentSize,
-        "use_fallback": input.useFallback,
-    }
+
+    # Create strategy based on input type
+    if is_ml_backtest and input.modelFile is not None:
+        # Get the full model path from the filename
+        import os # Testing purpose
+        # model_path = os.path.join(uploader.storage_dir, "sample_models", input.modelFile)
+        # print(f"Looking for model at path: {model_path}") # Testing purpose
+        model_path = os.path.join(uploader.storage_dir, input.user_id, input.modelFile)
+        if input.modelScalerFile:
+            scaler_path = os.path.join(
+                uploader.storage_dir, input.user_id, input.modelScalerFile
+            )
+            print(f"Looking for scaler at path: {scaler_path}") # Testing purpose
+            if not os.path.exists(scaler_path):
+                scaler_path = None
+        else:
+            scaler_path = None
+        print(f"Looking for model at path: {model_path}") # Testing purpose
+        if not model_path:
+            # Return error result directly instead of raising an exception
+            return BacktestResult(
+                id="",
+                symbol=input.symbol,
+                status=f"error: Model file {input.modelFile} not found",
+                data=[],
+                metrics=BacktestMetrics(
+                    total_return=0.0,
+                    sharpe_ratio=0.0,
+                    max_drawdown=0.0,
+                    win_rate=0.0,
+                ),
+                strategy=None,
+                profit_factor=0.0,
+                total_trades=0,
+                winning_trades=0,
+                losing_trades=0,
+                created_at=datetime.datetime.utcnow(),
+                updated_at=datetime.datetime.utcnow(),
+            )
+
+        strategy = MLTradingStrategy(
+            model_path=model_path,
+            scaler_path=scaler_path,
+        )
+        backtest_params = {
+            "data": data,
+            "strategy": strategy,
+            "period": input.period,
+            "init_cash": input.initCash,
+            "fees": input.fees,
+            "slippage": input.slippage,
+            "fixed_size": input.fixedSize,
+            "percent_size": input.percentSize,
+        }
+    else:
+        # Regular backtest
+        ma_params = {
+            "fast_ma_period": (
+                input.maCrossoverParams.fast if input.maCrossoverParams else 20
+            ),
+            "slow_ma_period": (
+                input.maCrossoverParams.slow if input.maCrossoverParams else 50
+            ),
+        }
+        strategy = CrossoverMAStrategy(**ma_params)
+        backtest_params = {
+            "data": data,
+            "strategy": strategy,
+            "period": input.period,
+            "init_cash": input.initCash,
+            "fees": input.fees,
+            "slippage": input.slippage,
+            "fixed_size": input.fixedSize,
+            "percent_size": input.percentSize,
+            "use_fallback": input.useFallback,
+        }
 
     try:
         result = service.run_backtest(**backtest_params)
 
         # Extract and format data for both GraphQL response and DB
-        portfolio_values = result.get_portfolio_values()
-        portfolio_data = [
-            {"Date": str(date), "portfolio_value": float(row["value"])}
-            for date, row in portfolio_values.iterrows()
-        ]
+        # For event-driven backtests, use regular portfolio values without signals
+        if service_type == "event-driven":
+            portfolio_values = result.get_portfolio_values()
+            portfolio_data = [
+                {
+                    "Date": str(date),
+                    "portfolio_value": float(row["value"]),
+                    "signal": "hold",
+                }
+                for date, row in portfolio_values.iterrows()
+            ]
+        else:
+            # For vectorized and ML backtests, use signals
+            portfolio_values = result.get_portfolio_values_with_signals()
+            portfolio_data = []
+            
+            # Check the structure of the DataFrame to handle dates properly
+            for _, row in portfolio_values.iterrows():
+                # Handle case where date might be in index or in column with different name
+                if isinstance(portfolio_values.index, pd.DatetimeIndex):
+                    date_value = str(row.name)  # Use index as date
+                elif "Date" in row:
+                    date_value = str(row["Date"])
+                elif "Date" in row:
+                    date_value = str(row["Date"])
+                else:
+                    # Fallback to first column or current date if no date found
+                    date_value = str(row.iloc[0]) if len(row) > 0 else str(datetime.datetime.now())
+                    
+                portfolio_data.append({
+                    "Date": date_value,
+                    "portfolio_value": float(row.get("value", 0.0)),
+                    "signal": str(row.get("signal", "hold")),
+                })
 
         stats = result.get_stats()
 
         # Check if the result has a portfolio to get trades from
-        if service_type == "vectorized":
+        if service_type in ["vectorized", "ml"] or is_ml_backtest:
             portfolio = result.get_portfolio()
             all_trades = (
                 portfolio.trades.records_readable if portfolio else pd.DataFrame()
@@ -245,6 +370,20 @@ async def run_and_save_backtest(
             total_trades = stats.get("total_trades", 0)
             win_rate = stats.get("win_rate", 0)
 
+        # Create strategy info for GraphQL response
+        if is_ml_backtest:
+            strategy_info = None  # ML models don't have MA parameters
+        else:
+            ma_params = {
+                "fast_ma_period": (
+                    input.maCrossoverParams.fast if input.maCrossoverParams else 20
+                ),
+                "slow_ma_period": (
+                    input.maCrossoverParams.slow if input.maCrossoverParams else 50
+                ),
+            }
+            strategy_info = MAStrategy(**ma_params)
+
         # Create the GraphQL response object
         graphql_result = BacktestResult(
             id="",  # Placeholder, as mutations don't have an ID yet; can be set if needed
@@ -261,7 +400,7 @@ async def run_and_save_backtest(
             losing_trades=losing_trades,
             total_trades=total_trades,
             profit_factor=stats.get("profit_factor", None),
-            strategy=MAStrategy(**ma_params),
+            strategy=strategy_info,
             created_at=datetime.datetime.utcnow(),
             updated_at=datetime.datetime.utcnow(),
         )
@@ -273,10 +412,17 @@ async def run_and_save_backtest(
 
         # Fix strategy dict keys to match expected model attributes
         strategy_dict = {}
-        if input.maCrossoverParams:
+        if not is_ml_backtest and input.maCrossoverParams:
             strategy_dict = {
                 "fast_ma_period": input.maCrossoverParams.fast,
                 "slow_ma_period": input.maCrossoverParams.slow,
+            }
+        else:
+            # For ML backtests or when no MA params are provided, use default values
+            # to satisfy the schema validation requirements
+            strategy_dict = {
+                "fast_ma_period": 0,  # Default value for ML models
+                "slow_ma_period": 0,  # Default value for ML models
             }
 
         pydantic_result = {
@@ -291,9 +437,13 @@ async def run_and_save_backtest(
             "sharpe_ratio": stats.get("sharpe_ratio", 0.0),
             "max_drawdown": stats.get("max_drawdown", 0.0),
             "profit_factor": stats.get("profit_factor", 0.0),
-            "metrics": {**stats, "strategy_name": "Moving Average Crossover"},
+            "metrics": {**stats, "strategy_name": strategy.get_strategy_name()},
             "data": [
-                {"Date": pv.Date, "portfolio_value": pv.portfolio_value}
+                {
+                    "Date": pv.Date,
+                    "portfolio_value": pv.portfolio_value,
+                    "signal": pv.signal,
+                }
                 for pv in graphql_result.data
             ],
         }
@@ -414,6 +564,22 @@ class Query:
             results.append(result)
         return results
 
+    @strawberry.field
+    async def get_user_models(self, user_id: str) -> List[ModelInfo]:
+        """Get list of ML models uploaded by a user."""
+        models = uploader.get_user_models(user_id)
+        return [
+            ModelInfo(
+                filename=model["filename"],
+                file_path=model["file_path"],
+                relative_path=model["relative_path"],
+                file_size=model["file_size"],
+                created_time=model["created_time"],
+                modified_time=model["modified_time"],
+            )
+            for model in models
+        ]
+
 
 @strawberry.type
 class Mutation:
@@ -425,6 +591,11 @@ class Mutation:
     @strawberry.mutation
     async def run_event_driven_backtest(self, input: BacktestInput) -> BacktestResult:
         result: BacktestResult = await run_and_save_backtest("event-driven", input)
+        return result
+
+    @strawberry.mutation
+    async def run_ml_backtest(self, input: BacktestInput) -> BacktestResult:
+        result: BacktestResult = await run_and_save_backtest("vectorized", input)
         return result
 
 

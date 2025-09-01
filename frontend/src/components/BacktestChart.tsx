@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 interface PortfolioValue {
     Date: string;
     portfolioValue: number;
+    signal?: string;
 }
 
 interface BacktestMetrics {
@@ -30,44 +31,71 @@ interface BacktestResult {
 
 interface BacktestChartProps {
     result: BacktestResult | null;
-    backtestType: "vectorized" | "event-driven";
+    backtestType: "vectorized" | "event-driven" | "custom-model";
     initCashValue: number;
 }
 
 const BacktestChart: React.FC<BacktestChartProps> = ({ result, backtestType, initCashValue }) => {
     if (!result || result.status !== "success") return null;
+    if (backtestType === "vectorized" || backtestType === "custom-model") {
+        // Use signal field to determine colors
+        const chartData = result.data.map((item) => {
+            let color = "#8884d8"; // default blue for hold
+            if (item.signal === "buy") {
+                color = "#00ff00"; // green for buy
+            } else if (item.signal === "sell") {
+                color = "#ff0000"; // red for sell
+            }
+            
+            return {
+                index: item.Date,
+                portfolioValue: item.portfolioValue,
+                color,
+                signal: item.signal || "hold",
+            };
+        });
 
-    if (backtestType === "vectorized") {
-        // Use index-based x-axis with numbers like 1, 2, etc.
-        const chartData = result.data.map((item) => ({
-            index: item.Date,
-            portfolioValue: item.portfolioValue,
-        }));
+        const CustomDot = (props: { cx?: number; cy?: number; payload?: { color: string; signal: string } }) => {
+            const { cx, cy, payload } = props;
+            if (!cx || !cy || !payload) return null;
+            
+            // Make buy/sell signals more prominent
+            const radius = payload.signal === "buy" || payload.signal === "sell" ? 6 : 3;
+            
+            return <circle cx={cx} cy={cy} r={radius} fill={payload.color} stroke="#333" strokeWidth={1} />;
+        };
 
         return (
             <Card>
                 <CardHeader>
                     <CardTitle>
-                        Portfolio Value Over Time (Vectorized Backtest)
+                        Portfolio Value Over Time ({backtestType === "vectorized" ? "Vectorized" : "Custom Model"} Backtest)
                     </CardTitle>
                     <CardDescription>
-                        Line chart showing portfolio value for each day
+                        Line chart showing portfolio value for each day. Green dots indicate buy signals, red dots indicate sell signals, blue for hold positions.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={400}>
-                        <LineChart data={chartData}>
+                        <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="index" />
                             <YAxis />
                             <Tooltip
-                                labelFormatter={(label) => `Point ${label}`}
+                                labelFormatter={(label) => `Date: ${label}`}
+                                formatter={(value, _name, props) => [
+                                    value,
+                                    `Portfolio Value (Signal: ${props.payload?.signal || 'hold'})`
+                                ]}
                             />
                             <Line
                                 type="monotone"
                                 dataKey="portfolioValue"
-                                stroke="#8884d8"
-                                strokeWidth={2}
+                                stroke="#cccccc"
+                                strokeWidth={1}
+                                dot={<CustomDot />}
+                                activeDot={{ r: 6 }}
+                                connectNulls={false}
                             />
                         </LineChart>
                     </ResponsiveContainer>
