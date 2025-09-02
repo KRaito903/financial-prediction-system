@@ -1,43 +1,62 @@
 import uuid
-from typing import Optional, Dict, Any
-from pathlib import Path
-import aiofiles
-from fastapi import UploadFile, HTTPException
+import os
 import logging
+from typing import Optional, Dict, Any, List
+from pathlib import Path
+from dotenv import load_dotenv
+from fastapi import UploadFile, HTTPException
+from supabase import create_client, Client
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Singleton Supabase client
+URL: str = os.getenv("SUPABASE_URL", "")
+KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+SUPABASE: Client = create_client(URL, KEY)
+
 
 class ModelUploader:
-    """Handles ML model file uploads and storage."""
+    """Handles ML model file uploads and storage using Supabase."""
 
-    def __init__(self, storage_dir: str = "storage"):
+    def __init__(self, bucket_name: str = "ml_models"):
         """
-        Initialize the model uploader.
+        Initialize the model uploader with Supabase storage.
 
         Args:
-            storage_dir: Directory to store uploaded models (relative to project root)
+            bucket_name: Name of the Supabase storage bucket to use
         """
-        self.project_root = Path(__file__).parent.parent.parent
-        self.storage_dir = self.project_root / storage_dir
-        self._ensure_storage_dir()
+        self.bucket_name = bucket_name
+        self._ensure_bucket_exists()
 
-    def _ensure_storage_dir(self):
-        """Ensure the storage directory exists."""
+    def _ensure_bucket_exists(self):
+        """Ensure the Supabase storage bucket exists."""
         try:
-            self.storage_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Storage directory created/verified: {self.storage_dir}")
+            # Get list of buckets
+            buckets = SUPABASE.storage.list_buckets()
+            bucket_exists = any(bucket.name == self.bucket_name for bucket in buckets)
+
+            # Create bucket if it doesn't exist
+            if not bucket_exists:
+                SUPABASE.storage.create_bucket(self.bucket_name)
+                logger.info(f"Created Supabase storage bucket: {self.bucket_name}")
+            else:
+                logger.info(
+                    f"Using existing Supabase storage bucket: {self.bucket_name}"
+                )
         except Exception as e:
-            logger.error(f"Failed to create storage directory: {e}")
+            logger.error(f"Failed to set up Supabase storage bucket: {e}")
             raise
 
     async def upload_model(
         self, file: UploadFile, user_id: str, model_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Upload an ML model file.
+        Upload an ML model file to Supabase storage.
 
         Args:
             file: The uploaded file
@@ -45,14 +64,14 @@ class ModelUploader:
             model_name: Optional custom name for the model
 
         Returns:
-            Dict containing upload information including file path
+            Dict containing upload information
         """
         try:
             # Validate file type
             if not file.filename or not self._is_valid_model_file(file.filename):
                 raise HTTPException(
                     status_code=400,
-                    detail="Invalid file type. Only .pkl, .joblib, .h5, .pb, and .onnx files are allowed.",
+                    detail="Invalid file type. Only .pkl, .joblib, .h5, .pb, .onnx, .pt, and .pth files are allowed.",
                 )
 
             # Generate unique filename
@@ -70,25 +89,30 @@ class ModelUploader:
                 ).rstrip()
                 filename = f"{user_id}_{safe_name}_{unique_id}{file_extension}"
 
-            # Create user-specific directory
-            user_dir = self.storage_dir / user_id
-            user_dir.mkdir(exist_ok=True)
+            # Define the storage path - store in user-specific folder
+            storage_path = f"{user_id}/{filename}"
 
-            # Full file path
-            file_path = user_dir / filename
-
-            # Save the file
-            async with aiofiles.open(file_path, "wb") as buffer:
-                content = await file.read()
-                await buffer.write(content)
-
-            # Get file info
+            # Read file content
+            content = await file.read()
             file_size = len(content)
+            # Upload to Supabase
+            SUPABASE.storage.from_(self.bucket_name).upload(
+                path=storage_path,
+                file=content,
+            )
+
+            # Get file URL (signed URL that expires)
+            file_url = SUPABASE.storage.from_(self.bucket_name).create_signed_url(
+                path=storage_path,
+                expires_in=3600,  # URL expires in 1 hour
+            )
+
+            # File information
             file_info = {
                 "filename": filename,
                 "original_filename": file.filename or "unknown",
-                "file_path": str(file_path),
-                "relative_path": str(file_path.relative_to(self.project_root)),
+                "storage_path": storage_path,
+                "file_url": file_url,
                 "file_size": file_size,
                 "user_id": user_id,
                 "model_name": model_name
@@ -99,13 +123,15 @@ class ModelUploader:
                 ),  # Could be replaced with actual timestamp
             }
 
-            logger.info(f"Model uploaded successfully: {file_path}")
+            logger.info(
+                f"Model uploaded successfully to Supabase storage: {storage_path}"
+            )
             return file_info
 
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Failed to upload model: {e}")
+            logger.error(f"Failed to upload model to Supabase: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Failed to upload model: {str(e)}"
             )
@@ -128,7 +154,7 @@ class ModelUploader:
 
         return file_extension in valid_extensions
 
-    def get_user_models(self, user_id: str) -> list:
+    def get_user_models(self, user_id: str) -> List[Dict[str, Any]]:
         """
         Get list of models uploaded by a user.
 
@@ -139,36 +165,46 @@ class ModelUploader:
             List of model information
         """
         try:
-            user_dir = self.storage_dir / user_id
-            if not user_dir.exists():
-                return []
+            # List files in the user's directory
+            user_path = f"{user_id}/"
+            file_list = SUPABASE.storage.from_(self.bucket_name).list(path=user_path)
 
             models = []
-            for file_path in user_dir.glob("*"):
-                if file_path.is_file():
-                    stat = file_path.stat()
+            for file_info in file_list:
+                if isinstance(file_info, dict):
+                    file_path = f"{user_id}/{file_info.get('name', '')}"
+
+                    # Generate temporary URL with read access
+                    temp_url = SUPABASE.storage.from_(
+                        self.bucket_name
+                    ).create_signed_url(
+                        path=file_path,
+                        expires_in=3600,  # URL expires in 1 hour
+                    )
+
+                    # Get metadata safely
+                    metadata = file_info.get("metadata", {})
+                    metadata = metadata if isinstance(metadata, dict) else {}
+
                     models.append(
                         {
-                            "filename": file_path.name,
-                            "file_path": str(file_path),
-                            "relative_path": str(
-                                file_path.relative_to(self.project_root)
-                            ),
-                            "file_size": stat.st_size,
-                            "created_time": stat.st_ctime,
-                            "modified_time": stat.st_mtime,
+                            "filename": file_info.get("name", ""),
+                            "storage_path": file_path,
+                            "file_url": temp_url,
+                            "file_size": metadata.get("size", 0),
+                            "created_time": metadata.get("createdAt", ""),
+                            "last_modified": metadata.get("updatedAt", ""),
                         }
                     )
 
             return models
-
         except Exception as e:
-            logger.error(f"Failed to get user models: {e}")
+            logger.error(f"Failed to get user models from Supabase: {e}")
             return []
 
     def delete_model(self, user_id: str, filename: str) -> bool:
         """
-        Delete a model file.
+        Delete a model file from Supabase storage.
 
         Args:
             user_id: ID of the user
@@ -178,43 +214,62 @@ class ModelUploader:
             True if deleted successfully, False otherwise
         """
         try:
-            user_dir = self.storage_dir / user_id
-            file_path = user_dir / filename
+            storage_path = f"{user_id}/{filename}"
 
-            if file_path.exists() and file_path.is_file():
-                file_path.unlink()
-                logger.info(f"Model deleted: {file_path}")
-                return True
-            else:
-                logger.warning(f"Model not found: {file_path}")
+            # Check if file exists before attempting deletion
+            try:
+                SUPABASE.storage.from_(self.bucket_name).get_public_url(
+                    path=storage_path
+                )
+            except Exception:
+                logger.warning(f"Model not found in Supabase: {storage_path}")
                 return False
 
+            # Delete the file
+            SUPABASE.storage.from_(self.bucket_name).remove(paths=[storage_path])
+            logger.info(f"Model deleted from Supabase: {storage_path}")
+            return True
+
         except Exception as e:
-            logger.error(f"Failed to delete model: {e}")
+            logger.error(f"Failed to delete model from Supabase: {e}")
             return False
 
     def get_model_path(self, user_id: str, filename: str) -> Optional[str]:
         """
-        Get the full path to a model file.
+        Get a signed URL for a model file.
 
         Args:
             user_id: ID of the user
             filename: Name of the model file
 
         Returns:
-            Full path to the model file or None if not found
+            Signed URL to access the model file or None if not found
         """
         try:
-            user_dir = self.storage_dir / user_id
-            file_path = user_dir / filename
+            storage_path = f"{user_id}/{filename}"
 
-            if file_path.exists() and file_path.is_file():
-                return str(file_path)
+            # Generate signed URL that allows temporary access
+            signed_url_response = SUPABASE.storage.from_(
+                self.bucket_name
+            ).create_signed_url(
+                path=storage_path,
+                expires_in=3600,  # URL expires in 1 hour
+            )
+
+            # Extract the string URL from the response object
+            if (
+                isinstance(signed_url_response, dict)
+                and "signedURL" in signed_url_response
+            ):
+                return signed_url_response["signedURL"]
+            elif hasattr(signed_url_response, "signedURL"):
+                return signed_url_response.signedURL
             else:
-                return None
+                # Convert to string as fallback
+                return str(signed_url_response)
 
         except Exception as e:
-            logger.error(f"Failed to get model path: {e}")
+            logger.error(f"Failed to get model URL from Supabase: {e}")
             return None
 
 

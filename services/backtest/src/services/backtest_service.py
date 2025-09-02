@@ -119,7 +119,9 @@ class MLTradingStrategy(TradingStrategy):
             else:
                 print(self.model)
             # Try to load scaler if it exists (common pattern)
-            scaler_path = self.scaler_path or self.model_path.replace(".pkl", "_scaler.pkl")
+            scaler_path = self.scaler_path or self.model_path.replace(
+                ".pkl", "_scaler.pkl"
+            )
             if os.path.exists(scaler_path):
                 self.scaler = joblib.load(scaler_path)
                 print(f"Scaler loaded from {scaler_path}")
@@ -336,12 +338,12 @@ class VectorizedBacktestResult(BacktestResult):
 
         # Add buy signals if available
         if self.entries is not None:
-            buy_dates = self.entries[self.entries == True].index
+            buy_dates = self.entries[self.entries].index
             portfolio_df.loc[portfolio_df["Date"].isin(buy_dates), "signal"] = "buy"
 
         # Add sell signals if available (sell takes precedence over buy on same day)
         if self.exits is not None:
-            sell_dates = self.exits[self.exits == True].index
+            sell_dates = self.exits[self.exits].index
             portfolio_df.loc[portfolio_df["Date"].isin(sell_dates), "signal"] = "sell"
 
         return portfolio_df
@@ -515,26 +517,26 @@ class BacktraderStrategyAdapter(bt.Strategy):
         else:
             self.entries = pd.Series()
             self.exits = pd.Series()
-    
+
     def notify_order(self, order):
         """Called when order status changes"""
         if order.status in [order.Completed, order.Canceled, order.Rejected]:
             self.order = None  # Clear the order when it's no longer pending
-    
+
     def next(self):
         if self.order:
             return
-            
+
         # Get current date from backtrader
         current_date = self.data.datetime.datetime(0)
-        
+
         # Look up signals for this specific date
         if current_date in self.entries.index:
             # Check entry signal for this specific date
             if self.entries.loc[current_date]:
                 self.order = self.buy()
                 print(f"BUY at {current_date}, price: {self.data.close[0]}")
-                
+
         if current_date in self.exits.index:
             # Check exit signal for this specific date
             if self.exits.loc[current_date] and self.position:

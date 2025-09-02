@@ -14,7 +14,9 @@ from ..utils.coint_list_fetcher import CoinListFetcher
 from ..utils.uploader import uploader
 import datetime
 from ..services.backtest_service import MLTradingStrategy
-
+import requests
+import os
+from ..utils.file_cacher import file_cacher
 
 
 # Input types
@@ -39,7 +41,7 @@ class BacktestInput:
     symbol: str
     fetch_input: OHLCVFetchInput
     maCrossoverParams: Optional[MACrossoverParamsInput] = None
-    modelFile: str
+    modelFile: Optional[str] = None
     modelScalerFile: Optional[str] = None
     period: str = "1D"
     initCash: float = 10000.0
@@ -48,21 +50,6 @@ class BacktestInput:
     fixedSize: Optional[bool] = None
     percentSize: Optional[float] = None
     useFallback: bool = True
-
-
-@strawberry.input
-class MLBacktestInput:
-    user_id: str
-    symbol: str
-    fetch_input: OHLCVFetchInput
-    threshold: float = 0.5
-    feature_columns: Optional[List[str]] = None
-    period: str = "1D"
-    initCash: float = 10000.0
-    fees: float = 0.001
-    slippage: float = 0.001
-    fixedSize: Optional[bool] = None
-    percentSize: Optional[float] = None
 
 
 @strawberry.input
@@ -236,27 +223,22 @@ async def run_and_save_backtest(
 
     # Create strategy based on input type
     if is_ml_backtest and input.modelFile is not None:
-        # Get the full model path from the filename
-        import os # Testing purpose
-        # model_path = os.path.join(uploader.storage_dir, "sample_models", input.modelFile)
-        # print(f"Looking for model at path: {model_path}") # Testing purpose
-        model_path = os.path.join(uploader.storage_dir, input.user_id, input.modelFile)
+        # Get the model URL from Supabase storage
+        model_path = uploader.get_model_path(input.user_id, input.modelFile)
+        scaler_path = None
+
         if input.modelScalerFile:
-            scaler_path = os.path.join(
-                uploader.storage_dir, input.user_id, input.modelScalerFile
-            )
-            print(f"Looking for scaler at path: {scaler_path}") # Testing purpose
-            if not os.path.exists(scaler_path):
-                scaler_path = None
-        else:
-            scaler_path = None
-        print(f"Looking for model at path: {model_path}") # Testing purpose
+            scaler_path = uploader.get_model_path(input.user_id, input.modelScalerFile)
+            print(f"Using scaler from Supabase: {input.modelScalerFile}")
+
+        print(f"Using model from Supabase: {input.modelFile}")
+
         if not model_path:
             # Return error result directly instead of raising an exception
             return BacktestResult(
                 id="",
                 symbol=input.symbol,
-                status=f"error: Model file {input.modelFile} not found",
+                status=f"error: Model file {input.modelFile} not found in storage",
                 data=[],
                 metrics=BacktestMetrics(
                     total_return=0.0,
@@ -273,20 +255,139 @@ async def run_and_save_backtest(
                 updated_at=datetime.datetime.utcnow(),
             )
 
-        strategy = MLTradingStrategy(
-            model_path=model_path,
-            scaler_path=scaler_path,
-        )
-        backtest_params = {
-            "data": data,
-            "strategy": strategy,
-            "period": input.period,
-            "init_cash": input.initCash,
-            "fees": input.fees,
-            "slippage": input.slippage,
-            "fixed_size": input.fixedSize,
-            "percent_size": input.percentSize,
-        }
+        try:
+            # Create user directory if it doesn't exist
+            storage_base_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage"
+            )
+            user_model_dir = os.path.join(storage_base_dir, input.user_id)
+            print(f"User model directory: {user_model_dir}")
+            os.makedirs(user_model_dir, exist_ok=True)
+
+            # Create paths for persistent storage
+            model_filename = os.path.basename(input.modelFile)
+            local_model_path = os.path.join(user_model_dir, model_filename)
+
+            # Check if model file already exists in cache
+            cached_model_path = await file_cacher.get_cached_file(
+                f"{input.user_id}_{model_filename}"
+            )
+
+            if cached_model_path and os.path.exists(cached_model_path):
+                print(f"Using cached model file: {cached_model_path}")
+                local_model_path = cached_model_path
+                # Update last_used time for the cached file
+                await file_cacher.cache_file(
+                    f"{input.user_id}_{model_filename}", local_model_path
+                )
+            else:
+                # Download model from URL to persistent storage
+                response = requests.get(model_path, stream=True)
+                response.raise_for_status()  # Will raise an exception for HTTP errors
+
+                # Write content to persistent file
+                with open(local_model_path, "wb") as model_file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        model_file.write(chunk)
+
+                print(f"Model saved to: {local_model_path}")
+
+                # Cache the file path for future use
+                await file_cacher.cache_file(
+                    f"{input.user_id}_{model_filename}", local_model_path
+                )
+
+            local_scaler_path = None
+            if scaler_path and input.modelScalerFile:
+                scaler_filename = os.path.basename(input.modelScalerFile)
+                local_scaler_path = os.path.join(user_model_dir, scaler_filename)
+
+                # Check if scaler file already exists in cache
+                cached_scaler_path = await file_cacher.get_cached_file(
+                    f"{input.user_id}_{scaler_filename}"
+                )
+
+                if cached_scaler_path and os.path.exists(cached_scaler_path):
+                    print(f"Using cached scaler file: {cached_scaler_path}")
+                    local_scaler_path = cached_scaler_path
+                    # Update last_used time for the cached file
+                    await file_cacher.cache_file(
+                        f"{input.user_id}_{scaler_filename}", local_scaler_path
+                    )
+                else:
+                    # Download scaler from URL to persistent storage
+                    response = requests.get(scaler_path, stream=True)
+                    response.raise_for_status()
+
+                    # Write content to persistent file
+                    with open(local_scaler_path, "wb") as scaler_file:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            scaler_file.write(chunk)
+
+                    print(f"Scaler saved to: {local_scaler_path}")
+
+                    # Cache the file path for future use
+                    await file_cacher.cache_file(
+                        f"{input.user_id}_{scaler_filename}", local_scaler_path
+                    )
+
+            # Use local file paths for the strategy
+            strategy = MLTradingStrategy(
+                model_path=local_model_path,
+                scaler_path=local_scaler_path,
+            )
+
+            backtest_params = {
+                "data": data,
+                "strategy": strategy,
+                "period": input.period,
+                "init_cash": input.initCash,
+                "fees": input.fees,
+                "slippage": input.slippage,
+                "fixed_size": input.fixedSize,
+                "percent_size": input.percentSize,
+            }
+
+        except requests.RequestException as e:
+            return BacktestResult(
+                id="",
+                symbol=input.symbol,
+                status=f"error: Failed to download model file: {str(e)}",
+                data=[],
+                metrics=BacktestMetrics(
+                    total_return=0.0,
+                    sharpe_ratio=0.0,
+                    max_drawdown=0.0,
+                    win_rate=0.0,
+                ),
+                strategy=None,
+                profit_factor=0.0,
+                total_trades=0,
+                winning_trades=0,
+                losing_trades=0,
+                created_at=datetime.datetime.utcnow(),
+                updated_at=datetime.datetime.utcnow(),
+            )
+        except Exception as e:
+            return BacktestResult(
+                id="",
+                symbol=input.symbol,
+                status=f"error: Failed to prepare ML model: {str(e)}",
+                data=[],
+                metrics=BacktestMetrics(
+                    total_return=0.0,
+                    sharpe_ratio=0.0,
+                    max_drawdown=0.0,
+                    win_rate=0.0,
+                ),
+                strategy=None,
+                profit_factor=0.0,
+                total_trades=0,
+                winning_trades=0,
+                losing_trades=0,
+                created_at=datetime.datetime.utcnow(),
+                updated_at=datetime.datetime.utcnow(),
+            )
     else:
         # Regular backtest
         ma_params = {
@@ -329,7 +430,7 @@ async def run_and_save_backtest(
             # For vectorized and ML backtests, use signals
             portfolio_values = result.get_portfolio_values_with_signals()
             portfolio_data = []
-            
+
             # Check the structure of the DataFrame to handle dates properly
             for _, row in portfolio_values.iterrows():
                 # Handle case where date might be in index or in column with different name
@@ -341,13 +442,19 @@ async def run_and_save_backtest(
                     date_value = str(row["Date"])
                 else:
                     # Fallback to first column or current date if no date found
-                    date_value = str(row.iloc[0]) if len(row) > 0 else str(datetime.datetime.now())
-                    
-                portfolio_data.append({
-                    "Date": date_value,
-                    "portfolio_value": float(row.get("value", 0.0)),
-                    "signal": str(row.get("signal", "hold")),
-                })
+                    date_value = (
+                        str(row.iloc[0])
+                        if len(row) > 0
+                        else str(datetime.datetime.now())
+                    )
+
+                portfolio_data.append(
+                    {
+                        "Date": date_value,
+                        "portfolio_value": float(row.get("value", 0.0)),
+                        "signal": str(row.get("signal", "hold")),
+                    }
+                )
 
         stats = result.get_stats()
 
