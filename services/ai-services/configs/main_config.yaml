@@ -1,0 +1,55 @@
+# configs/main_config.yaml
+feature_engineering:
+  # Cấu hình cho việc tích hợp sentiment
+  sentiment:
+    enabled: false
+    # Các tham số cho sentiment model có thể đặt ở đây
+
+  # Cấu hình cho các feature dựa trên thời gian
+  time_based_features:
+    - hour
+    - dayofweek
+    - weekofyear
+
+  # Cấu hình cho các feature trễ (lag)
+  lag_features:
+    - column: 'close'
+      periods: [1, 2, 3, 24] # Giá đóng cửa của 1, 2, 3, và 24 giờ trước
+
+  # Cấu hình cho các chỉ báo kỹ thuật (dùng pandas-ta)
+  technical_indicators:
+    - name: 'ema' # Tên hàm trong pandas-ta
+      params: { length: 12 }
+    - name: 'ema'
+      params: { length: 26 }
+    - name: 'sma' # Simple Moving Average
+      params: { length: 50 }
+    - name: 'rsi'
+      params: { length: 14 }
+    - name: 'bbands' # Bollinger Bands
+      params: { length: 20, std: 2 }
+    - name: 'macd'
+      params: { fast: 12, slow: 26, signal: 9 }
+
+  # Danh sách các cột cuối cùng sẽ được chuẩn hóa (scale)
+  # Cần cập nhật danh sách này nếu bạn thêm/thay đổi chỉ báo
+  features_to_scale:
+    - 'open'
+    - 'high'
+    - 'low'
+    - 'close'
+    - 'volume'
+    - 'sentiment_score' # Thêm cột sentiment
+    - 'close_lag_1' # Thêm các cột lag
+    - 'close_lag_2'
+    - 'close_lag_3'
+    - 'close_lag_24'
+    - 'EMA_12' # Tên cột được pandas-ta tự động tạo
+    - 'EMA_26'
+    - 'SMA_50'
+    - 'RSI_14'
+    - 'BBM_20_2' # Cột Moving Average của Bollinger Bands
+    - 'BBP_20_2' # Cột %B của Bollinger Bands
+    - 'MACD_12_26_9'
+    - 'MACDh_12_26_9'
+    - 'MACDs_12_26_9'
