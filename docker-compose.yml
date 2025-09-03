@@ -6,7 +6,7 @@ services:
       target: dev
     container_name: frontend
     ports:
-      - "3000:5173"
+      - "5173:5173"
     environment:
       - NODE_ENV=development
     depends_on:
@@ -40,9 +40,30 @@ services:
           action: sync
           target: /usr/src/app
 
+  charting-service:
+    build:
+      context: ./services/charting-service
+      dockerfile: Dockerfile
+    container_name: charting-service
+    ports:
+      - "3000:3000"  # Socket.io server
+      - "4002:4002"  # GraphQL server
+    environment:
+      - NODE_ENV=development
+    develop:
+      watch:
+        - path: ./services/charting-service/package.json
+          action: rebuild
+        - path: ./services/charting-service/
+          action: sync
+          target: /app
+          ignore:
+            - node_modules/
+
   apollo-service-router:
     depends_on:
       - users-service
+      - charting-service
     image: ghcr.io/apollographql/router:v2.5.0
     container_name: apollo-service-router
     ports:
