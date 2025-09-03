@@ -80,7 +80,7 @@ class WebSocketManager {
     ws.on('message', (data) => {
       try {
         const message = JSON.parse(data.toString());
-        if (message.e === 'kline') {
+        if (message.e === 'kline' && message.x === true) { // Ensure kline is closed
           const kline = message.k;
           const candlestick = {
             time: kline.t,

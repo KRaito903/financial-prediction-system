@@ -1,12 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ApolloProvider } from '@apollo/client';
 import { apolloClient } from './lib/apollo-client';
-import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
-import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (

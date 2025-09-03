@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useApolloClient } from '@apollo/client';
 import type { ReactNode } from 'react';
 import { type MarketConfig } from '../components/MarketSelector';
+import { GET_LATEST_KLINES } from '../lib/queries';
 
 interface CandlestickData {
   time: number;
@@ -37,6 +39,35 @@ interface SocketProviderProps {
   children: ReactNode;
 }
 
+const KlineInterval = {
+  ONE_MINUTE: 'ONE_MINUTE',
+  FIVE_MINUTES: 'FIVE_MINUTES', 
+  FIFTEEN_MINUTES: 'FIFTEEN_MINUTES',
+  ONE_HOUR: 'ONE_HOUR',
+} as const;
+
+type KlineInterval = typeof KlineInterval[keyof typeof KlineInterval];
+
+const convertToGraphQLInterval = (interval: string): KlineInterval => {
+  const mapping: Record<string, KlineInterval> = {
+    '1m': KlineInterval.ONE_MINUTE,
+    '5m': KlineInterval.FIVE_MINUTES,
+    '15m': KlineInterval.FIFTEEN_MINUTES,
+    '1h': KlineInterval.ONE_HOUR,
+  };
+  return mapping[interval] || KlineInterval.ONE_MINUTE;
+};
+
+const transformKlineToCandle = (kline: any): CandlestickData => ({
+  time: kline.openTime,
+  open: parseFloat(kline.open),
+  high: parseFloat(kline.high),
+  low: parseFloat(kline.low),
+  close: parseFloat(kline.close),
+  symbol: kline.symbol,
+  interval: kline.interval
+});
+
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -44,30 +75,67 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentMarket, setCurrentMarket] = useState<MarketConfig | null>(null);
   const [loading, setLoading] = useState(false);
+  const apolloClient = useApolloClient();
 
-  const subscribeToMarket = useCallback((config: MarketConfig) => {
+  const subscribeToMarket = useCallback(async (config: MarketConfig) => {
     if (!socket || !connected) {
       console.warn('Socket not connected yet');
       return;
     }
+    
     setLoading(true);
     setError(null);
 
-    if (currentMarket) {
-      socket.emit('unsubscribe_market', {
-        symbol: currentMarket.symbol,
-        interval: currentMarket.interval
+    try {
+      // 1. Unsubscribe from current market
+      if (currentMarket) {
+        socket.emit('unsubscribe_market', {
+          symbol: currentMarket.symbol,
+          interval: currentMarket.interval
+        });
+      }
+
+      // 2. Fetch historical data via GraphQL
+      const intervalEnum = convertToGraphQLInterval(config.interval);
+      const { data } = await apolloClient.query({
+        query: GET_LATEST_KLINES,
+        variables: {
+          symbol: config.symbol,
+          interval: intervalEnum,
+          limit: 100
+        },
+        fetchPolicy: 'network-only'
       });
+
+      // 3. Transform GraphQL data to candlestick format
+      const historicalData = data.getLatestKlines.data.map(transformKlineToCandle);
+
+      // 4. Set historical data immediately
+      setCandlestickData(historicalData);
+
+      // 5. Subscribe to real-time updates
+      socket.emit('subscribe_market', {
+        symbol: config.symbol,
+        interval: config.interval
+      });
+
+      setCurrentMarket(config);
+      
+    } catch (error: any) {
+      console.error('Error fetching historical data:', error);
+      setError(error.message);
+      
+      // Fall back to real-time only if GraphQL fails
+      socket.emit('subscribe_market', {
+        symbol: config.symbol,
+        interval: config.interval
+      });
+      setCandlestickData([]);
+      setCurrentMarket(config);
+    } finally {
+      setLoading(false);
     }
-
-    socket.emit('subscribe_market', {
-      symbol: config.symbol,
-      interval: config.interval
-    });
-
-    setCurrentMarket(config);
-    setCandlestickData([]); 
-  }, [socket, connected, currentMarket])
+  }, [socket, connected, currentMarket, apolloClient])
 
   useEffect(() => {
     // Connect to charting service Socket.io server
@@ -80,12 +148,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
       if (!currentMarket) {
         const defaultMarket: MarketConfig = { symbol: 'BTC/USDT', interval: '1m', displayName: 'BTC/USDT - 1m' };
-        newSocket.emit('subscribe_market', {
-          symbol: defaultMarket.symbol,
-          interval: defaultMarket.interval
-        });
         setCurrentMarket(defaultMarket);
         
+        // Use the new subscribeToMarket function for consistent behavior
+        subscribeToMarket(defaultMarket);
       }
     });
 
@@ -114,6 +180,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         if (updated.length > 0 && updated[updated.length - 1].time === data.time) {
           updated[updated.length - 1] = data; // Update existing candlestick
         } else {
+          if (updated[updated.length - 1] && data.time < updated[updated.length - 1].time) {
+            // Ignore out-of-order data
+            return updated;
+          }
           updated.push(data); // Add new candlestick
         }
         
@@ -129,7 +199,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('🔌 Cleaning up Socket.io connection');
       newSocket.disconnect();
     };
-  }, [currentMarket]);
+  }, []);
 
   const value = {
     socket,

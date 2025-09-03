@@ -13,14 +13,16 @@ interface MarketSelectorProps {
 }
 
 const COIN_PAIRS = [
-  { value: 'BTCUSDT', label: 'BTC/USDT' },
-  { value: 'BTCUSDC', label: 'BTC/USDC' },
+  { value: 'BTC/USDT', label: 'BTC/USDT' },
+  { value: 'ETH/USDT', label: 'ETH/USDT' },
+  { value: 'BNB/USDT', label: 'BNB/USDT' },
 ];
 
 const TIME_INTERVALS = [
-  { value: '1m', label: '1 Minute' },
-  { value: '5m', label: '5 Minutes' },
-  { value: '15m', label: '15 Minutes' },
+  { value: '1m', label: '1m' },
+  { value: '5m', label: '5m' },
+  { value: '15m', label: '15m' },
+  { value: '1h', label: '1h' },
 ];
 
 const MarketSelector: React.FC<MarketSelectorProps> = ({ 
@@ -45,63 +47,62 @@ const MarketSelector: React.FC<MarketSelectorProps> = ({
   const hasChanges = selectedSymbol !== currentConfig.symbol || selectedInterval !== currentConfig.interval;
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Market Settings</h3>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Coin Pair
-          </label>
-          <select 
-            value={selectedSymbol}
-            onChange={(e) => setSelectedSymbol(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            disabled={loading}
-          >
-            {COIN_PAIRS.map(pair => (
-              <option key={pair.value} value={pair.value}>
-                {pair.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Time Interval
-          </label>
-          <select 
-            value={selectedInterval}
-            onChange={(e) => setSelectedInterval(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            disabled={loading}
-          >
-            {TIME_INTERVALS.map(interval => (
-              <option key={interval.value} value={interval.value}>
-                {interval.label}
-              </option>
-            ))}
-          </select>
+    <div className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Trading Pair
+        </label>
+        <div className="space-y-2">
+          {COIN_PAIRS.map(pair => (
+            <button
+              key={pair.value}
+              onClick={() => setSelectedSymbol(pair.value)}
+              disabled={loading}
+              className={`w-full text-left px-3 py-2 rounded-md border transition-colors ${
+                selectedSymbol === pair.value
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-300 hover:border-gray-400 text-gray-700'
+              } ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+            >
+              {pair.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">
-          Current: {currentConfig.displayName}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Time Frame
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {TIME_INTERVALS.map(interval => (
+            <button
+              key={interval.value}
+              onClick={() => setSelectedInterval(interval.value)}
+              disabled={loading}
+              className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                selectedInterval === interval.value
+                  ? 'border-indigo-500 bg-indigo-500 text-white'
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              } ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+            >
+              {interval.label}
+            </button>
+          ))}
         </div>
-        <button
-          onClick={handleApply}
-          disabled={!hasChanges || loading}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            hasChanges && !loading
-              ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {loading ? 'Applying...' : 'Apply Changes'}
-        </button>
       </div>
+
+      <button
+        onClick={handleApply}
+        disabled={!hasChanges || loading}
+        className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          hasChanges && !loading
+            ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+        }`}
+      >
+        {loading ? 'Applying...' : 'Apply Changes'}
+      </button>
     </div>
   );
 };
