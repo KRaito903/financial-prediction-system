@@ -1,40 +1,40 @@
 services:
-  kafka:
-    image: apache/kafka:4.0.1-rc0
-    container_name: kafka
-    # ports:
-    #   - "9092:9092"
-    environment:
-      # KRaft settings
-      - KAFKA_NODE_ID=1
-      - KAFKA_PROCESS_ROLES=broker,controller
-      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+  # kafka:
+  #   image: apache/kafka:4.0.1-rc0
+  #   container_name: kafka
+  #   # ports:
+  #   #   - "9092:9092"
+  #   environment:
+  #     # KRaft settings
+  #     - KAFKA_NODE_ID=1
+  #     - KAFKA_PROCESS_ROLES=broker,controller
+  #     - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+  #     - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
 
-      # --- This is the fix for your issue ---
-      # Listeners configuration
-      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      # -------------------------------------
+  #     # --- This is the fix for your issue ---
+  #     # Listeners configuration
+  #     - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+  #     - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+  #     # -------------------------------------
       
-      # Allow topic creation
-      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+  #     # Allow topic creation
+  #     - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+  #     - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
   
-  kafka-init:
-    image: apache/kafka:4.0.1-rc0
-    container_name: kafka-init
-    depends_on:
-      - kafka
-    command: >
-      bash -c "
-        echo 'Waiting for Kafka to be ready...' &&
-        sleep 10 &&
-        echo 'Creating topics...' &&
-        /opt/kafka/bin/kafka-topics.sh --create --topic sentiment_news_requests --bootstrap-server kafka:9092 &&
-        /opt/kafka/bin/kafka-topics.sh --create --topic sentiment_news_responses --bootstrap-server kafka:9092 &&
-        echo 'Topics created successfully.'
-      "
+  # kafka-init:
+  #   image: apache/kafka:4.0.1-rc0
+  #   container_name: kafka-init
+  #   depends_on:
+  #     - kafka
+  #   command: >
+  #     bash -c "
+  #       echo 'Waiting for Kafka to be ready...' &&
+  #       sleep 10 &&
+  #       echo 'Creating topics...' &&
+  #       /opt/kafka/bin/kafka-topics.sh --create --topic sentiment_news_requests --bootstrap-server kafka:9092 &&
+  #       /opt/kafka/bin/kafka-topics.sh --create --topic sentiment_news_responses --bootstrap-server kafka:9092 &&
+  #       echo 'Topics created successfully.'
+  #     "
   frontend:
     build:
       context: ./frontend
@@ -109,48 +109,48 @@ services:
       - APOLLO_GRAPH_REF
       - APOLLO_KEY
 
-  sentiment-service-database:
-    image: postgres:13.22-alpine
-    container_name: sentiment-service-database
-    build: 
-      context: ./services/sentiment-news-prediction-service
-      dockerfile: Dockerfile_db
-    # ports:
-    #   - "5432:5432"
-    environment:
-      - POSTGRES_USER=$SENTIMENT_DATABASE_POSTGRES_USER
-      - POSTGRES_PASSWORD=$SENTIMENT_DATABASE_POSTGRES_PASSWORD
+  # sentiment-service-database:
+  #   image: postgres:13.22-alpine
+  #   container_name: sentiment-service-database
+  #   build: 
+  #     context: ./services/sentiment-news-prediction-service
+  #     dockerfile: Dockerfile_db
+  #   # ports:
+  #   #   - "5432:5432"
+  #   environment:
+  #     - POSTGRES_USER=$SENTIMENT_DATABASE_POSTGRES_USER
+  #     - POSTGRES_PASSWORD=$SENTIMENT_DATABASE_POSTGRES_PASSWORD
 
-  sentiment-service:
-    depends_on:
-      - sentiment-service-database
-      - kafka-init
-    build:
-      context: ./services/sentiment-news-prediction-service
-      dockerfile: Dockerfile
-      target: dev
-    container_name: sentiment-service
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://$SENTIMENT_DATABASE_POSTGRES_USER:$SENTIMENT_DATABASE_POSTGRES_PASSWORD@sentiment-service-database/$SENTIMENT_DATABASE_DATABASE
-      - GEMINI_MODEL=gemini-2.0-flash
-      - GEMINI_API_KEY=$SENTIMENT_SERVICE_GEMINI_API_KEY
+  # sentiment-service:
+  #   depends_on:
+  #     - sentiment-service-database
+  #     - kafka-init
+  #   build:
+  #     context: ./services/sentiment-news-prediction-service
+  #     dockerfile: Dockerfile
+  #     target: dev
+  #   container_name: sentiment-service
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - DATABASE_URL=postgresql://$SENTIMENT_DATABASE_POSTGRES_USER:$SENTIMENT_DATABASE_POSTGRES_PASSWORD@sentiment-service-database/$SENTIMENT_DATABASE_DATABASE
+  #     - GEMINI_MODEL=gemini-2.0-flash
+  #     - GEMINI_API_KEY=$SENTIMENT_SERVICE_GEMINI_API_KEY
 
-  backtest-service:
-    build:
-      context: ./services/backtest
-      dockerfile: Dockerfile
-    container_name: backtest-service
-    ports:
-      - "5050:5050"
-    env_file:
-      - ./services/backtest/.env
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5050/health', timeout=10)"]
-      interval: 60s
-      timeout: 30s
-      retries: 3
-      start_period: 30s
+  # backtest-service:
+  #   build:
+  #     context: ./services/backtest
+  #     dockerfile: Dockerfile
+  #   container_name: backtest-service
+  #   ports:
+  #     - "5050:5050"
+  #   env_file:
+  #     - ./services/backtest/.env
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5050/health', timeout=10)"]
+  #     interval: 60s
+  #     timeout: 30s
+  #     retries: 3
+  #     start_period: 30s
 
   influxdb2:
     image: influxdb:2

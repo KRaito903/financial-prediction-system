@@ -19,7 +19,7 @@ class WebSocketManager {
 
   closeAllStreams(): void {
     console.log('🔌 Closing all WebSocket connections...');
-    for (const [streamKey, stream] of this.streams) {
+    for (const [, stream] of this.streams) {
       stream.websocket?.close();
     }
     this.streams.clear();
