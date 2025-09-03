@@ -42,7 +42,7 @@ services:
       target: dev
     container_name: frontend
     ports:
-      - "3000:5173"
+      - "5173:5173"
     environment:
       - NODE_ENV=development
     depends_on:
@@ -76,9 +76,30 @@ services:
           action: sync
           target: /usr/src/app
 
+  charting-service:
+    build:
+      context: ./services/charting-service
+      dockerfile: Dockerfile
+    container_name: charting-service
+    ports:
+      - "3000:3000"  # Socket.io server
+      - "4002:4002"  # GraphQL server
+    environment:
+      - NODE_ENV=development
+    develop:
+      watch:
+        - path: ./services/charting-service/package.json
+          action: rebuild
+        - path: ./services/charting-service/
+          action: sync
+          target: /app
+          ignore:
+            - node_modules/
+
   apollo-service-router:
     depends_on:
       - users-service
+      - charting-service
     image: ghcr.io/apollographql/router:v2.5.0
     container_name: apollo-service-router
     ports:
@@ -130,3 +151,26 @@ services:
       timeout: 30s
       retries: 3
       start_period: 30s
+
+  influxdb2:
+    image: influxdb:2
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME_FILE: /run/secrets/influxdb2-admin-username
+      DOCKER_INFLUXDB_INIT_PASSWORD_FILE: /run/secrets/influxdb2-admin-password
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN_FILE: /run/secrets/influxdb2-admin-token
+      DOCKER_INFLUXDB_INIT_ORG: docs
+      DOCKER_INFLUXDB_INIT_BUCKET: home
+    secrets:
+      - influxdb2-admin-username
+      - influxdb2-admin-password
+      - influxdb2-admin-token
+secrets:
+  influxdb2-admin-username:
+    file: ./.env.influxdb2-admin-username
+  influxdb2-admin-password:
+    file: ./.env.influxdb2-admin-password
+  influxdb2-admin-token:
+    file: ./.env.influxdb2-admin-token
