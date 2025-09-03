@@ -13,6 +13,7 @@ interface AuthContextType {
   login: (user: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  loading: boolean;  // Add loading state
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -31,6 +32,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);  // Initialize to true
 
   const login = (user: User) => {
     setUser(user);
@@ -49,6 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+    setLoading(false);  // Set loading to false after check
   }, []);
 
   const value = {
@@ -56,6 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     isAuthenticated,
+    loading,  // Include in context
   };
 
   return (
