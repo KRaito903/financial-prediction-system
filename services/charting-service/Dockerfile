@@ -27,4 +27,4 @@ USER nodejs
 EXPOSE 3000 4002
 
 # Start the service
-CMD ["tsx", "src/index.ts"]
+CMD ["tsx", "watch", "src/index.ts"]

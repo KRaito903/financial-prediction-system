@@ -57,10 +57,17 @@ export enum KlineInterval {
   ONE_MONTH = '1M'
 }
 
+import { InfluxDBAPI } from './influxdb-api';
+
 export class BinanceAPI {
   private readonly baseURL = 'https://api.binance.com';
   private readonly cache = new Map<string, { data: KlineResponse; timestamp: number }>();
   private readonly CACHE_TTL = 60000; // 1 minute cache
+  private influxDB: InfluxDBAPI | null = null;
+
+  constructor(influxDB?: InfluxDBAPI) {
+    this.influxDB = influxDB || null;
+  }
 
   private convertInterval(interval: string): string {
     const intervalMap: Record<string, string> = {
@@ -134,11 +141,84 @@ export class BinanceAPI {
     endTime?: number,
     limit?: number
   ): Promise<KlineResponse> {
+    // Step 1: Check InfluxDB first if available
+    if (this.influxDB) {
+      try {
+        const influxResult = await this.influxDB.queryKlines(symbol, interval, startTime, endTime, limit);
+        
+        if (influxResult && influxResult.data.length > 0) {
+          // For queries with time ranges, check for gaps
+          if (startTime && endTime) {
+            const gaps = await this.influxDB.getDataGaps(symbol, interval, startTime, endTime);
+            
+            if (gaps.length === 0) {
+              console.log(`💾 Complete data found in InfluxDB for ${symbol} ${interval}`);
+              return influxResult;
+            } else {
+              console.log(`📊 Partial data in InfluxDB, filling ${gaps.length} gaps from Binance API`);
+              
+              // Fill gaps from Binance API
+              const allKlines = [...influxResult.data];
+              
+              for (const gap of gaps) {
+                const gapData = await this.fetchFromBinanceAPI(symbol, interval, gap.start, gap.end);
+                if (gapData.data.length > 0) {
+                  allKlines.push(...gapData.data);
+                  // Store gap data in InfluxDB
+                  await this.influxDB.writeKlines(gapData.data);
+                }
+              }
+              
+              // Sort and return combined data
+              allKlines.sort((a, b) => a.openTime - b.openTime);
+              
+              return {
+                data: limit ? allKlines.slice(0, limit) : allKlines,
+                count: limit ? Math.min(allKlines.length, limit) : allKlines.length,
+                symbol,
+                interval,
+                startTime,
+                endTime
+              };
+            }
+          } else {
+            // For queries without time ranges (like getLatestKlines), return what we have
+            return influxResult;
+          }
+        } else {
+        }
+      } catch (error) {
+        console.warn('⚠️ InfluxDB query failed, falling back to Binance API:', error);
+      }
+    }
+
+    // Step 2: Fetch from Binance API (fallback or primary method)
+    const result = await this.fetchFromBinanceAPI(symbol, interval, startTime, endTime, limit);
+    
+    // Step 3: Store in InfluxDB if available and we have data
+    if (this.influxDB && result.data.length > 0) {
+      try {
+        await this.influxDB.writeKlines(result.data);
+      } catch (error) {
+        console.warn('⚠️ Failed to store data in InfluxDB:', error);
+      }
+    }
+
+    return result;
+  }
+
+  private async fetchFromBinanceAPI(
+    symbol: string,
+    interval: string,
+    startTime?: number,
+    endTime?: number,
+    limit?: number
+  ): Promise<KlineResponse> {
     const cacheKey = this.getCacheKey(symbol, interval, startTime, endTime, limit);
     
-    // Check cache first
+    // Check in-memory cache first
     if (this.isValidCache(cacheKey)) {
-      console.log(`📈 Cache hit for ${cacheKey}`);
+      console.log(`📈 Memory cache hit for ${cacheKey}`);
       return this.cache.get(cacheKey)!.data;
     }
 
@@ -177,13 +257,12 @@ export class BinanceAPI {
         endTime
       };
 
-      // Cache the result
+      // Cache the result in memory
       this.cache.set(cacheKey, {
         data: result,
         timestamp: Date.now()
       });
 
-      console.log(`📈 Successfully fetched ${transformedData.length} klines for ${symbol} ${interval}`);
       return result;
       
     } catch (error) {

@@ -6,6 +6,8 @@ import { gql } from "graphql-tag";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 
 import { BinanceAPI } from "./datasources/binance-api";
+import { InfluxDBAPI } from "./datasources/influxdb-api";
+import { getInfluxDBConfig, validateInfluxDBConfig } from "./config/influxdb";
 import { resolvers } from "./resolvers";
 
 const typeDefs = gql(
@@ -22,7 +24,22 @@ export async function startGraphQLServer() {
     schema: buildSubgraphSchema({ typeDefs, resolvers }),
   });
 
-  const binanceAPI = new BinanceAPI();
+  // Initialize InfluxDB if configuration is available
+  let influxDB: InfluxDBAPI | null = null;
+  if (validateInfluxDBConfig()) {
+    try {
+      const config = getInfluxDBConfig();
+      console.log(config);
+      influxDB = new InfluxDBAPI(config);
+      console.log('💾 InfluxDB initialized for persistent caching');
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize InfluxDB, using in-memory cache only:', error);
+    }
+  } else {
+    console.log('📈 InfluxDB not configured, using in-memory cache only');
+  }
+
+  const binanceAPI = new BinanceAPI(influxDB || undefined);
 
   // Set up cache cleanup interval
   setInterval(() => {
@@ -34,6 +51,7 @@ export async function startGraphQLServer() {
       return {
         dataSources: {
           binanceAPI,
+          influxDB,
         },
       };
     },
