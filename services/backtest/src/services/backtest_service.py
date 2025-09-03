@@ -4,6 +4,10 @@ import backtrader as bt
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, TypeVar, Generic
+import joblib
+import os
+from sklearn.preprocessing import StandardScaler
+
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -70,6 +74,166 @@ class SimpleStrategy(TradingStrategy):
         return entries, exits
 
 
+class MLTradingStrategy(TradingStrategy):
+    """Machine Learning based trading strategy."""
+
+    def __init__(
+        self,
+        model_path: str,
+        scaler_path: Optional[str] = None,
+        feature_columns: Optional[list] = None,
+        threshold: float = 0.5,
+    ):
+        """
+        Initialize ML trading strategy.
+
+        Args:
+            model_path: Path to the saved ML model (pickle file)
+            feature_columns: List of column names to use as features. If None, uses default OHLCV features
+            threshold: Probability threshold for signal generation (default 0.5)
+        """
+        self.model_path = model_path
+        self.scaler_path = scaler_path
+        self.feature_columns = feature_columns or [
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume",
+        ]
+        self.threshold = threshold
+        self.model = None
+        self.scaler = None
+        self._load_model()
+
+    def _load_model(self):
+        """Load the ML model and scaler from disk."""
+        try:
+            if not os.path.exists(self.model_path):
+                raise FileNotFoundError(f"Model file not found: {self.model_path}")
+
+            # Load the model (assuming it's saved with joblib)
+            self.model = joblib.load(self.model_path)
+            if self.model is None:
+                raise ValueError("Loaded model is None")
+            else:
+                print(self.model)
+            # Try to load scaler if it exists (common pattern)
+            scaler_path = self.scaler_path or self.model_path.replace(
+                ".pkl", "_scaler.pkl"
+            )
+            if os.path.exists(scaler_path):
+                self.scaler = joblib.load(scaler_path)
+                print(f"Scaler loaded from {scaler_path}")
+                print(self.scaler)
+            else:
+                # Create a default scaler if none exists
+                self.scaler = StandardScaler()
+                print("No scaler found, using default StandardScaler")
+
+        except Exception as e:
+            raise ValueError(f"Failed to load ML model: {str(e)}")
+
+    def _extract_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Extract features from OHLCV data for ML model."""
+        features = data[self.feature_columns].copy()
+
+        # Add some basic technical indicators as features
+        if "Close" in features.columns:
+            # Simple moving averages
+            features["SMA_5"] = data["Close"].rolling(window=5).mean()
+            features["SMA_10"] = data["Close"].rolling(window=10).mean()
+            features["SMA_20"] = data["Close"].rolling(window=20).mean()
+
+            # Price changes
+            features["Returns"] = data["Close"].pct_change()
+            features["Returns_5"] = data["Close"].pct_change(5)
+
+            # Volatility
+            features["Volatility_5"] = data["Close"].rolling(window=5).std()
+            features["Volatility_10"] = data["Close"].rolling(window=10).std()
+
+        if "Volume" in features.columns:
+            # Volume indicators
+            features["Volume_SMA_5"] = data["Volume"].rolling(window=5).mean()
+            features["Volume_Ratio"] = (
+                data["Volume"] / data["Volume"].rolling(window=5).mean()
+            )
+
+        # Fill NaN values
+        features = features.bfill().ffill().fillna(0)
+
+        return features
+
+    def get_strategy_name(self) -> str:
+        return f"ML_Model_{os.path.basename(self.model_path)}"
+
+    def generate_signals(self, data: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+        """
+        Generate trading signals using the ML model.
+
+        The model should output probabilities or binary predictions.
+        For binary classification:
+        - 1 = Buy signal
+        - 0 = Sell signal or hold
+
+        For probability outputs, we use the threshold to determine signals.
+        """
+        if self.model is None:
+            raise ValueError("ML model not loaded")
+
+        # Extract features
+        features = self._extract_features(data)
+
+        # Scale features if scaler is available
+        if self.scaler is not None:
+            features_scaled = pd.DataFrame(
+                self.scaler.transform(features),
+                columns=features.columns,
+                index=features.index,
+            )
+        else:
+            features_scaled = features
+
+        # Make predictions
+        try:
+            if hasattr(self.model, "predict_proba"):
+                # Model supports probability predictions
+                probabilities = self.model.predict_proba(features_scaled)
+                if probabilities.shape[1] == 2:
+                    # Binary classification - take probability of positive class
+                    predictions = probabilities[:, 1]
+                else:
+                    # Multi-class - take highest probability
+                    predictions = np.max(probabilities, axis=1)
+            else:
+                # Model only supports direct predictions
+                predictions = self.model.predict(features_scaled)
+
+            # Generate signals based on predictions
+            if predictions.dtype in [np.float32, np.float64]:
+                # Probability-based signals
+                buy_signals = predictions > self.threshold
+                sell_signals = predictions < (1 - self.threshold)
+            else:
+                # Binary classification signals
+                buy_signals = predictions == 1
+                sell_signals = predictions == 0
+
+            # Convert to pandas Series with proper indexing
+            entries = pd.Series(buy_signals, index=data.index, dtype=bool)
+            exits = pd.Series(sell_signals, index=data.index, dtype=bool)
+
+            # Clean up signals (avoid overlapping signals)
+            # If we have a buy signal, don't sell on the same day
+            exits = exits & ~entries
+
+            return entries, exits
+
+        except Exception as e:
+            raise ValueError(f"Failed to generate signals with ML model: {str(e)}")
+
+
 class DataPreprocessor:
     """Responsible for data validation and preprocessing."""
 
@@ -110,9 +274,17 @@ class BacktestResult(ABC):
 class VectorizedBacktestResult(BacktestResult):
     """Value object to store backtest results."""
 
-    def __init__(self, portfolio: vbt.Portfolio, strategy_name: str):
+    def __init__(
+        self,
+        portfolio: vbt.Portfolio,
+        strategy_name: str,
+        entries: Optional[pd.Series] = None,
+        exits: Optional[pd.Series] = None,
+    ):
         self.portfolio = portfolio
         self.strategy_name = strategy_name
+        self.entries = entries
+        self.exits = exits
 
     def get_stats(self) -> Dict[str, Any]:
         """Return key performance statistics."""
@@ -140,13 +312,41 @@ class VectorizedBacktestResult(BacktestResult):
     def get_portfolio_values(self) -> pd.DataFrame:
         """Return the portfolio values as a DataFrame."""
         if self.portfolio.value() is None:
-            return pd.DataFrame(columns=["date", "value"])
+            return pd.DataFrame(columns=["Date", "value"])
         return (
             self.portfolio.value()
             .to_frame(name="value")
             .reset_index()
-            .rename(columns={"index": "date"})
+            .rename(columns={"index": "Date"})
         )
+
+    def get_portfolio_values_with_signals(self) -> pd.DataFrame:
+        """Return the portfolio values with buy/sell signals as a DataFrame."""
+        if self.portfolio.value() is None:
+            return pd.DataFrame(columns=["Date", "value", "signal"])
+
+        # Get portfolio values
+        portfolio_df = (
+            self.portfolio.value()
+            .to_frame(name="value")
+            .reset_index()
+            .rename(columns={"index": "Date"})
+        )
+
+        # Add signal column
+        portfolio_df["signal"] = "hold"
+
+        # Add buy signals if available
+        if self.entries is not None:
+            buy_dates = self.entries[self.entries].index
+            portfolio_df.loc[portfolio_df["Date"].isin(buy_dates), "signal"] = "buy"
+
+        # Add sell signals if available (sell takes precedence over buy on same day)
+        if self.exits is not None:
+            sell_dates = self.exits[self.exits].index
+            portfolio_df.loc[portfolio_df["Date"].isin(sell_dates), "signal"] = "sell"
+
+        return portfolio_df
 
 
 class EventDrivenBacktestResult(BacktestResult):
@@ -182,7 +382,15 @@ class EventDrivenBacktestResult(BacktestResult):
         """Return the portfolio values as a DataFrame."""
         # Backtrader does not provide time series portfolio values directly
         # This is a placeholder implementation
-        return pd.DataFrame(columns=["date", "value"])
+        return pd.DataFrame(columns=["Date", "value"])
+
+    def get_portfolio_values_with_signals(self) -> pd.DataFrame:
+        """Return the portfolio values with signals as a DataFrame (event-driven doesn't support signals)."""
+        # Event-driven backtests don't have signal data, so we return values without signals
+        portfolio_df = self.get_portfolio_values()
+        if not portfolio_df.empty:
+            portfolio_df["signal"] = "hold"
+        return portfolio_df
 
 
 # Define a type variable for the result type
@@ -282,7 +490,9 @@ class VectorizedBacktestService(BacktestService[VectorizedBacktestResult]):
 
         # Create portfolio
         portfolio = vbt.Portfolio.from_signals(**portfolio_kwargs)
-        return VectorizedBacktestResult(portfolio, strategy.get_strategy_name())
+        return VectorizedBacktestResult(
+            portfolio, strategy.get_strategy_name(), entries, exits
+        )
 
 
 # Backtrader strategy that works with our TradingStrategy interface
@@ -304,42 +514,34 @@ class BacktraderStrategyAdapter(bt.Strategy):
             self.entries, self.exits = self.trading_strategy.generate_signals(
                 self.data_feed
             )
-            self.entry_idx = 0
-            self.exit_idx = 0
         else:
             self.entries = pd.Series()
             self.exits = pd.Series()
 
-    def next(self):
-        # Skip if we're out of signals
-        if (
-            self.entry_idx >= len(self.entries)
-            or self.exit_idx >= len(self.exits)
-            or len(self.entries) == 0
-            or len(self.exits) == 0
-        ):
-            return
+    def notify_order(self, order):
+        """Called when order status changes"""
+        if order.status in [order.Completed, order.Canceled, order.Rejected]:
+            self.order = None  # Clear the order when it's no longer pending
 
-        # Check if an order is pending
+    def next(self):
         if self.order:
             return
 
-        current_date = self.data.datetime.date()
+        # Get current date from backtrader
+        current_date = self.data.datetime.datetime(0)
 
-        # Check for entry signal
-        if self.entry_idx < len(self.entries) and self.entries.iloc[self.entry_idx]:
-            self.order = self.buy()
-            print(f"BUY at {current_date}, price: {self.data.close[0]}")
+        # Look up signals for this specific date
+        if current_date in self.entries.index:
+            # Check entry signal for this specific date
+            if self.entries.loc[current_date]:
+                self.order = self.buy()
+                print(f"BUY at {current_date}, price: {self.data.close[0]}")
 
-        # Check for exit signal
-        elif self.exit_idx < len(self.exits) and self.exits.iloc[self.exit_idx]:
-            if self.position:
+        if current_date in self.exits.index:
+            # Check exit signal for this specific date
+            if self.exits.loc[current_date] and self.position:
                 self.order = self.sell()
                 print(f"SELL at {current_date}, price: {self.data.close[0]}")
-
-        # Update indices
-        self.entry_idx += 1
-        self.exit_idx += 1
 
 
 class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
@@ -368,7 +570,7 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
             slippage: Slippage as a decimal.
             fixed_size: Number of shares/contracts to trade.
             percent_size: Percentage of portfolio to allocate per position.
-            period: Frequency of the data.
+            period: Frequency of the data. Not directly used in Backtrader but kept for interface consistency.
             use_fallback: Whether to use fallback strategy if primary generates no signals.
 
         Returns:
@@ -425,10 +627,6 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
         cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
         cerebro.addanalyzer(bt.analyzers.Returns, _name="returns")
         cerebro.addanalyzer(bt.analyzers.SQN, _name="sqn")
-
-        # Create data feed from processed data
-        data_feed = bt.feeds.PandasData(dataname=processed_data)  # type: ignore
-        cerebro.adddata(data_feed)
 
         # Run the backtest
         results = cerebro.run()
@@ -492,6 +690,91 @@ class EventDrivenBacktestService(BacktestService[EventDrivenBacktestResult]):
         )
 
 
+class MLBacktestService(BacktestService[VectorizedBacktestResult]):
+    """Service for backtesting using custom machine learning models."""
+
+    def run_backtest(
+        self,
+        data: pd.DataFrame,
+        strategy: Optional[TradingStrategy] = None,
+        period: str = "1D",
+        init_cash: float = 10000,
+        fees: float = 0.001,
+        slippage: float = 0.001,
+        fixed_size: Optional[int] = None,
+        percent_size: Optional[float] = None,
+        model_path: Optional[str] = None,
+        feature_columns: Optional[list] = None,
+        threshold: float = 0.5,
+    ) -> VectorizedBacktestResult:
+        """
+        Backtest a custom ML model strategy.
+
+        Args:
+            data: DataFrame containing OHLCV data.
+            strategy: TradingStrategy instance (should be MLTradingStrategy).
+            model_path: Path to the saved ML model file (alternative to strategy).
+            feature_columns: List of column names to use as features.
+            threshold: Probability threshold for signal generation.
+            period: Frequency of the data (default is '1D').
+            init_cash: Initial capital for backtesting (default is 10000).
+            fees: Trading fees as a decimal (default is 0.001, which is 0.1%).
+            slippage: Slippage as a decimal (default is 0.001, which is 0.1%).
+            fixed_size: Fixed position size (number of shares/contracts).
+            percent_size: Percentage of portfolio to allocate per position.
+
+        Returns:
+            VectorizedBacktestResult object containing the results.
+        """
+        # Create ML strategy if not provided
+        if strategy is None:
+            if model_path is None:
+                raise ValueError("Either strategy or model_path must be provided")
+            strategy = MLTradingStrategy(
+                model_path=model_path,
+                feature_columns=feature_columns,
+                threshold=threshold,
+            )
+        # Ensure it's an ML strategy
+        if not isinstance(strategy, MLTradingStrategy):
+            raise ValueError("Strategy must be an instance of MLTradingStrategy")
+
+        # Preprocess data
+        processed_data = self.preprocessor.validate_and_preprocess(data)
+
+        # Generate signals from the ML strategy
+        entries, exits = strategy.generate_signals(processed_data)
+
+        # Check sizing parameters
+        if fixed_size is not None and percent_size is not None:
+            raise ValueError(
+                "Cannot use both fixed size and percent size sizers at the same time."
+            )
+
+        # Create portfolio kwargs
+        portfolio_kwargs = {
+            "close": processed_data["Close"],
+            "entries": entries,
+            "exits": exits,
+            "freq": period,
+            "init_cash": init_cash,
+            "fees": fees,
+            "slippage": slippage,
+        }
+
+        # Add sizing parameter if provided
+        if fixed_size is not None:
+            portfolio_kwargs["size"] = fixed_size
+        elif percent_size is not None:
+            portfolio_kwargs["size"] = percent_size
+
+        # Create portfolio
+        portfolio = vbt.Portfolio.from_signals(**portfolio_kwargs)
+        return VectorizedBacktestResult(
+            portfolio, strategy.get_strategy_name(), entries, exits
+        )
+
+
 class BacktestServiceFactory:
     """Factory for creating backtest services."""
 
@@ -502,5 +785,7 @@ class BacktestServiceFactory:
             return VectorizedBacktestService()
         elif service_type.lower() == "event-driven":
             return EventDrivenBacktestService()
+        elif service_type.lower() in ["model", "ml"]:
+            return MLBacktestService()
         else:
             raise ValueError(f"Unknown backtest service type: {service_type}")

@@ -3,94 +3,135 @@ config:
   theme: redux-dark
 ---
 graph TD
-    Client([Client Application]) -->|API Requests| GraphQLEndpoint
-    
-    subgraph "API Gateway Layer (GraphQL)"
-        GraphQLEndpoint([GraphQL Endpoint])
-        GraphQLEndpoint -->|handles GraphQL| StrawberrySchema
-        GraphQLEndpoint -->|routes REST| FastAPI
-    end
+    Client([Client Application])
     
     subgraph "API Layer"
-        FastAPI([FastAPI])
-        StrawberrySchema([Strawberry Schema])
+        FastAPI[FastAPI Routes]
+        GraphQL[GraphQL Endpoint]
+        StrawberrySchema[Strawberry Schema]
         
-        FastAPI -->|uses| InputModel[Pydantic Models]
-        FastAPI -->|exposes| RestEndpoints["REST Endpoints"]
-        StrawberrySchema -->|defines| GraphQLTypes["GraphQL Types"]
-        StrawberrySchema -->|defines| GraphQLQueries["GraphQL Queries"]
-        StrawberrySchema -->|defines| GraphQLMutations["GraphQL Mutations"]
-        
-        StrawberrySchema -->|forwards processed request to| FastAPI
+        FastAPI --> StrawberrySchema
+        GraphQL --> StrawberrySchema
     end
     
-    subgraph "Utils Layer"
+    Client <--> FastAPI
+    Client <--> GraphQL
+    
+    subgraph "GraphQL Resolvers"
+        Query[Query Resolvers]
+        Mutation[Mutation Resolvers]
+        
+        StrawberrySchema --> Query
+        StrawberrySchema --> Mutation
+    end
+    
+    subgraph "Service Factory"
+        BacktestFactory[BacktestServiceFactory]
+        
+        Mutation --> BacktestFactory
+    end
+    
+    subgraph "Backtest Services"
+        VectorizedService[VectorizedBacktestService]
+        EventService[EventDrivenBacktestService]
+        MLService[MLBacktestService]
+        
+        BacktestFactory --> VectorizedService
+        BacktestFactory --> EventService
+        BacktestFactory --> MLService
+    end
+    
+    subgraph "Strategy Implementations"
+        CrossoverMA[CrossoverMAStrategy]
+        SimpleStrategy[SimpleStrategy]
+        MLStrategy[MLTradingStrategy]
+        
+        VectorizedService --> CrossoverMA
+        VectorizedService --> SimpleStrategy
+        EventService --> CrossoverMA
+        EventService --> SimpleStrategy
+        MLService --> MLStrategy
+    end
+    
+    subgraph "Execution Engines"
+        VectorBT[VectorBT Portfolio]
+        Backtrader[Backtrader Cerebro]
+        MLModel[Scikit-Learn Models]
+        
+        VectorizedService --> VectorBT
+        EventService --> Backtrader
+        MLService --> VectorBT
+        MLStrategy --> MLModel
+    end
+    
+    subgraph "Data Fetching"
+        BinanceAPI[Binance OHLCV API]
+        CoinListAPI[Binance Exchange Info]
         OHLCVFetcher[BinanceOHLCV]
-        CoinListFetcher[CoinListFetcher]
-        MongoConnector[mongodb_connector]
+        CoinFetcher[CoinListFetcher]
         
-        StrawberrySchema -->|uses| OHLCVFetcher
-        StrawberrySchema -->|uses| CoinListFetcher
-        FastAPI -->|uses| MongoConnector
+        Query --> OHLCVFetcher
+        Query --> CoinFetcher
+        OHLCVFetcher --> BinanceAPI
+        CoinFetcher --> CoinListAPI
+        Mutation --> OHLCVFetcher
     end
     
-    FastAPI --> Factory
-    
-    subgraph "Service Layer"
-        Factory[BacktestServiceFactory]
-        DataPreprocessor[DataPreprocessor]
-        Factory -->|creates| VectorService[VectorizedBacktestService]
-        Factory -->|creates| EventService[EventDrivenBacktestService]
-        VectorService & EventService -->|uses| DataPreprocessor
-    end
-    
-    subgraph "Strategy Layer"
-        VectorService & EventService -->|uses| TradingStrategies[TradingStrategy]
-        TradingStrategies -->|implements| CrossoverStrategy[CrossoverMAStrategy]
-        TradingStrategies -->|implements| SimpleStrategy[SimpleStrategy]
-    end
-    
-    subgraph "Result Types"
-        AbstractResult[BacktestResult]
-        VectorizedResult[VectorizedBacktestResult]
-        EventDrivenResult[EventDrivenBacktestResult]
+    subgraph "File Management"
+        ModelUploader[ModelUploader]
+        FileCacher[FileCacher Singleton]
+        SupabaseStorage[(Supabase Storage)]
+        LocalStorage[Local File System]
         
-        AbstractResult -.->|extends| VectorizedResult
-        AbstractResult -.->|extends| EventDrivenResult
-        
-        VectorService -->|produces| VectorizedResult
-        EventService -->|produces| EventDrivenResult
+        FastAPI --> ModelUploader
+        ModelUploader --> SupabaseStorage
+        MLService --> FileCacher
+        FileCacher --> LocalStorage
+        MLStrategy --> LocalStorage
     end
     
-    subgraph "Persistence Layer"
-        BacktestDatabase[BacktestDatabase]
+    subgraph "Database Layer"
+        BacktestDB[BacktestDatabase]
         BacktestMapper[BacktestMapper]
-        BacktestModel[BacktestPydanticResult]
+        MongoConnector[MongoDB Connector]
+        MongoDB[(MongoDB)]
         
-        FastAPI -->|saves to| BacktestDatabase
-        BacktestDatabase -->|uses| BacktestMapper
-        BacktestDatabase -->|maps to| BacktestModel
-        BacktestDatabase -->|connects via| MongoConnector
+        Mutation --> BacktestDB
+        Query --> BacktestDB
+        BacktestDB --> BacktestMapper
+        BacktestDB --> MongoConnector
+        MongoConnector --> MongoDB
+        FileCacher --> MongoDB
     end
     
-    Client -->|OHLCV Data| GraphQLEndpoint
+    subgraph "Data Models"
+        PydanticModels[Pydantic Models]
+        StrawberryTypes[Strawberry Types]
+        
+        BacktestMapper --> PydanticModels
+        StrawberrySchema --> StrawberryTypes
+    end
     
-    %% Response flow section
-    VectorizedResult & EventDrivenResult -->|formatted as JSON| ResponseData[Response Data]
+    subgraph "Result Processing"
+        VectorizedResult[VectorizedBacktestResult]
+        EventResult[EventDrivenBacktestResult]
+        
+        VectorizedService --> VectorizedResult
+        EventService --> EventResult
+        MLService --> VectorizedResult
+        VectorizedResult --> BacktestDB
+        EventResult --> BacktestDB
+    end
     
-    %% GraphQL response path
-    ResponseData -->|GraphQL data| StrawberrySchema
-    StrawberrySchema -->|processed response| GraphQLEndpoint
-    
-    %% REST response path
-    ResponseData -->|REST data| FastAPI
-    FastAPI -->|REST response| GraphQLEndpoint
-    
-    GraphQLEndpoint -->|formatted response| Client
-    
-    VectorService -->|uses| VectorBT[vectorbt]
-    EventService -->|uses| Backtrader[backtrader]
-    
-    OHLCVFetcher -->|fetches from| BinanceAPI[Binance API]
-    CoinListFetcher -->|fetches from| BinanceAPI
-    MongoConnector -->|connects to| MongoDB[mongodb]
+    %% External Dependencies
+    subgraph "External Libraries"
+        VBT[vectorbt]
+        BT[backtrader]
+        SKL[scikit-learn]
+        Pandas[pandas]
+        
+        VectorBT -.-> VBT
+        Backtrader -.-> BT
+        MLModel -.-> SKL
+        OHLCVFetcher -.-> Pandas
+    end
