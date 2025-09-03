@@ -3,8 +3,18 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
 import { CandlestickSeries, createChart, ColorType } from 'lightweight-charts';
-
-export const ChartComponent = (props) => {
+import MarketSelector from './MarketSelector';
+import { type DeepPartial } from 'lightweight-charts';
+interface CandlestickData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  symbol?: string;
+  interval?: string;
+}
+export const ChartComponent = (props: {data: CandlestickData[], colors?: {backgroundColor: string, textColor: string, upColor: string, downColor: string, borderVisible: DeepPartial<boolean> | undefined, wickUpColor: string, wickDownColor:string }}) => {
   const { data,
         colors: {
             backgroundColor = 'white',
@@ -44,7 +54,7 @@ export const ChartComponent = (props) => {
       wickUpColor,
       wickDownColor,
     });
-    newSeries.setData(data);
+    newSeries.setData(data as any);
 
     window.addEventListener('resize', handleResize);
 
@@ -65,7 +75,7 @@ export const ChartComponent = (props) => {
 const Dashboard: React.FC = () => {
   // const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { connected, candlestickData, error } = useSocket();
+  const { connected, candlestickData, error, currentMarket, subscribeToMarket, loading } = useSocket();
 
   const handleLogout = () => {
     // logout();
@@ -112,8 +122,19 @@ const Dashboard: React.FC = () => {
                 Dashboard
               </h2>
               <p className="text-gray-600 mb-6">
-                Real-time BTC/USDT candlestick chart powered by Binance data
+                Real-time cryptocurrency candlestick charts powered by Binance data
               </p>
+              
+              {/* Market Selector */}
+              {currentMarket && (
+                <div className="mb-6">
+                  <MarketSelector 
+                    currentConfig={currentMarket}
+                    onConfigChange={subscribeToMarket}
+                    loading={loading}
+                  />
+                </div>
+              )}
               
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -129,8 +150,10 @@ const Dashboard: React.FC = () => {
                 <div className="text-left space-y-2">
                   <p><span className="font-medium">Connection:</span> {connected ? '✅ Connected' : '❌ Disconnected'}</p>
                   <p><span className="font-medium">Data Points:</span> {candlestickData.length}</p>
-                  <p><span className="font-medium">Symbol:</span> BTC/USDT</p>
-                  <p><span className="font-medium">Interval:</span> 1 minute</p>
+                  <p><span className="font-medium">Market:</span> {currentMarket?.displayName || 'Loading...'}</p>
+                  <p><span className="font-medium">Status:</span> {loading ? '🔄 Switching...' : '✅ Ready'}</p>
+                </div>
+                <div>
                 </div>
               </div>
               

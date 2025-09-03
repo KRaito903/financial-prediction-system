@@ -1,5 +1,5 @@
-import WebSocket from 'ws';
-import { broadcastCandlestick } from './socket';
+import WebSocket from "ws";
+import { broadcastCandlestick } from "./socket";
 
 interface MarketStream {
   symbol: string;
@@ -7,28 +7,56 @@ interface MarketStream {
   websocket: WebSocket | null;
   subscribers: number;
 }
-
 class WebSocketManager {
   private streams: Map<string, MarketStream> = new Map();
   private reconnectAttempts: Map<string, number> = new Map();
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
   private readonly RECONNECT_DELAY = 3000;
-
-  generateStreamKey(symbol: string, interval: string): string {
-    return `${symbol.toLowerCase()}@kline_${interval}`;
+  
+  getActiveStreams(): string[] {
+    return Array.from(this.streams.keys());
   }
 
-  subscribeToMarket(symbol: string, interval: string): void {
-    const streamKey = this.generateStreamKey(symbol, interval);
-    
-    if (this.streams.has(streamKey)) {
-      const stream = this.streams.get(streamKey)!;
-      stream.subscribers++;
-      console.log(`📈 Added subscriber to ${streamKey}. Total: ${stream.subscribers}`);
+  closeAllStreams(): void {
+    console.log('🔌 Closing all WebSocket connections...');
+    for (const [streamKey, stream] of this.streams) {
+      stream.websocket?.close();
+    }
+    this.streams.clear();
+    this.reconnectAttempts.clear();
+  }
+
+  unsubscribeFromMarket(symbol: string, interval: string) {
+    const streamKey = `${symbol.toLowerCase().replace('/','')}@kline_${interval}`;
+    if (!this.streams.has(streamKey)) {
+      console.warn(`⚠️ No active subscription for ${streamKey} to unsubscribe`);
       return;
     }
 
-    console.log(`🔗 Creating new WebSocket connection for ${streamKey}`);
+    const stream = this.streams.get(streamKey)!;
+    stream.subscribers -= 1;
+
+    if (stream.subscribers <= 0) {
+      // No more subscribers, close the WebSocket connection
+      stream.websocket?.close();
+      this.streams.delete(streamKey);
+      this.reconnectAttempts.delete(streamKey);
+      console.log(`🛑 Unsubscribed from ${streamKey} and closed connection`);
+    } else {
+      console.log(`🔔 Decremented subscriber for ${streamKey}. Remaining subscribers: ${stream.subscribers}`);
+    }
+  }
+
+  subscribeToMarket(symbol: string, interval: string) {
+    const streamKey = `${symbol.toLowerCase().replace('/','')}@kline_${interval}`;
+    if (this.streams.has(streamKey)) {
+      // Already subscribed, increment subscriber count
+      const stream = this.streams.get(streamKey)!;
+      stream.subscribers += 1;
+      console.log(`🔔 Incremented subscriber for ${streamKey}. Total subscribers: ${stream.subscribers}`);
+      return;
+    }
+
     const wsUrl = `wss://fstream.binance.com/ws/${streamKey}`;
     const ws = new WebSocket(wsUrl);
 
@@ -41,41 +69,21 @@ class WebSocketManager {
 
     this.setupWebSocketHandlers(ws, streamKey, stream);
     this.streams.set(streamKey, stream);
+    this.reconnectAttempts.set(streamKey, 0);
   }
 
-  unsubscribeFromMarket(symbol: string, interval: string): void {
-    const streamKey = this.generateStreamKey(symbol, interval);
-    const stream = this.streams.get(streamKey);
-
-    if (!stream) return;
-
-    stream.subscribers--;
-    console.log(`📉 Removed subscriber from ${streamKey}. Remaining: ${stream.subscribers}`);
-
-    if (stream.subscribers <= 0) {
-      console.log(`🔌 Closing WebSocket connection for ${streamKey}`);
-      stream.websocket?.close();
-      this.streams.delete(streamKey);
-      this.reconnectAttempts.delete(streamKey);
-    }
-  }
-
-  private setupWebSocketHandlers(ws: WebSocket, streamKey: string, stream: MarketStream): void {
+  private setupWebSocketHandlers(ws: WebSocket, streamKey: string, stream: MarketStream) {
     ws.on('open', () => {
-      console.log(`✅ Connected to Binance WebSocket: ${streamKey}`);
-      this.reconnectAttempts.set(streamKey, 0);
-      // broadcastMarketChange(stream.symbol, stream.interval, 'connected');
+      console.log(`✅ Connected to Binance stream: ${streamKey}`);
     });
 
     ws.on('message', (data) => {
       try {
         const message = JSON.parse(data.toString());
-        
-        if (message.e === 'kline' && message.k) {
+        if (message.e === 'kline') {
           const kline = message.k;
-          
           const candlestick = {
-            time: Math.floor(message.E / 1000),
+            time: kline.t,
             open: parseFloat(kline.o),
             high: parseFloat(kline.h),
             low: parseFloat(kline.l),
@@ -83,30 +91,24 @@ class WebSocketManager {
             symbol: stream.symbol,
             interval: stream.interval
           };
-          
-          console.log(`📊 ${streamKey} candlestick:`, candlestick);
           broadcastCandlestick(candlestick);
         }
-      } catch (error) {
-        console.error(`❌ Error parsing WebSocket data for ${streamKey}:`, error);
+      } catch (err) {
+        console.error('❌ Error parsing message:', err);
       }
     });
 
-    ws.on('error', (error) => {
-      console.error(`❌ WebSocket error for ${streamKey}:`, error);
-      // broadcastMarketChange(stream.symbol, stream.interval, 'error');
-    });
-
-    ws.on('close', (code, reason) => {
-      console.log(`🔌 WebSocket closed for ${streamKey}: ${code} - ${reason}`);
-      // broadcastMarketChange(stream.symbol, stream.interval, 'disconnected');
-      
+    ws.on('close', () => {
+      console.log(`❌ Disconnected from Binance stream: ${streamKey}`);
       if (this.streams.has(streamKey)) {
         this.handleReconnection(streamKey, stream);
       }
     });
-  }
 
+    ws.on('error', (err) => {
+      console.error(`❌ WebSocket error on stream ${streamKey}:`, err);
+    });
+  }
   private handleReconnection(streamKey: string, stream: MarketStream): void {
     const attempts = this.reconnectAttempts.get(streamKey) || 0;
     
@@ -128,19 +130,6 @@ class WebSocketManager {
       this.streams.delete(streamKey);
       this.reconnectAttempts.delete(streamKey);
     }
-  }
-
-  getActiveStreams(): string[] {
-    return Array.from(this.streams.keys());
-  }
-
-  closeAllStreams(): void {
-    console.log('🔌 Closing all WebSocket connections...');
-    for (const [streamKey, stream] of this.streams) {
-      stream.websocket?.close();
-    }
-    this.streams.clear();
-    this.reconnectAttempts.clear();
   }
 }
 

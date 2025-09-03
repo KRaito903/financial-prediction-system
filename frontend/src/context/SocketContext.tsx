@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { ReactNode } from 'react';
+import { type MarketConfig } from '../components/MarketSelector';
 
 interface CandlestickData {
   time: number;
@@ -8,6 +9,8 @@ interface CandlestickData {
   high: number;
   low: number;
   close: number;
+  symbol?: string;
+  interval?: string;
 }
 
 interface SocketContextType {
@@ -15,6 +18,9 @@ interface SocketContextType {
   connected: boolean;
   candlestickData: CandlestickData[];
   error: string | null;
+  currentMarket: MarketConfig | null;
+  subscribeToMarket: (config: MarketConfig) => void;
+  loading: boolean;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -36,6 +42,32 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [connected, setConnected] = useState(false);
   const [candlestickData, setCandlestickData] = useState<CandlestickData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentMarket, setCurrentMarket] = useState<MarketConfig | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const subscribeToMarket = useCallback((config: MarketConfig) => {
+    if (!socket || !connected) {
+      console.warn('Socket not connected yet');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    if (currentMarket) {
+      socket.emit('unsubscribe_market', {
+        symbol: currentMarket.symbol,
+        interval: currentMarket.interval
+      });
+    }
+
+    socket.emit('subscribe_market', {
+      symbol: config.symbol,
+      interval: config.interval
+    });
+
+    setCurrentMarket(config);
+    setCandlestickData([]); 
+  }, [socket, connected, currentMarket])
 
   useEffect(() => {
     // Connect to charting service Socket.io server
@@ -45,28 +77,36 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('✅ Connected to Socket.io server');
       setConnected(true);
       setError(null);
+
+      if (!currentMarket) {
+        const defaultMarket: MarketConfig = { symbol: 'BTC/USDT', interval: '1m', displayName: 'BTC/USDT - 1m' };
+        newSocket.emit('subscribe_market', {
+          symbol: defaultMarket.symbol,
+          interval: defaultMarket.interval
+        });
+        setCurrentMarket(defaultMarket);
+        
+      }
     });
 
     newSocket.on('disconnect', () => {
       console.log('❌ Disconnected from Socket.io server');
       setConnected(false);
+      setLoading(false);
     });
 
     newSocket.on('connect_error', (err) => {
       console.error('❌ Socket.io connection error:', err);
       setError(err.message);
       setConnected(false);
-    });
-
-    // Handle historical data when first connecting
-    newSocket.on('historical_data', (data: CandlestickData[]) => {
-      console.log(`📤 Received ${data.length} historical candlesticks`);
-      setCandlestickData(data);
+      setLoading(false);
     });
 
     // Handle real-time candlestick updates
     newSocket.on('candlestick', (data: CandlestickData) => {
-      console.log('📊 Received real-time candlestick:', data);
+      if (currentMarket && data?.symbol !== currentMarket?.symbol) {
+        return;
+      }
       setCandlestickData(prev => {
         const updated = [...prev];
         
@@ -89,13 +129,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('🔌 Cleaning up Socket.io connection');
       newSocket.disconnect();
     };
-  }, []);
+  }, [currentMarket]);
 
   const value = {
     socket,
     connected,
     candlestickData,
     error,
+    currentMarket,
+    subscribeToMarket,
+    loading
   };
 
   return (

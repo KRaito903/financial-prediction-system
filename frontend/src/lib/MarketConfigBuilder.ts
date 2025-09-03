@@ -8,7 +8,7 @@ export interface MarketEndpoint {
 export interface ExtendedMarketConfig extends MarketConfig {
   endpoints: MarketEndpoint;
   isValid: boolean;
-  binanceSymbol?: string; // For Binance markets
+  binanceSymbol?: string;
 }
 
 export class MarketConfigBuilder {
@@ -33,7 +33,7 @@ export class MarketConfigBuilder {
     if (displayName) {
       this.config.displayName = displayName;
     } else {
-      this.config.displayName = `${this.config.symbol} - ${this.config.interval}`; ;
+      this.config.displayName = `${this.config.symbol} - ${this.config.interval}`;
     }
     return this;
   }
@@ -58,7 +58,6 @@ export class MarketConfigBuilder {
     if (!this.config.displayName) {
       this.withDisplayName();
     }
-    // TODO(human): Implement validation logic for market configuration
     this.config.isValid = true;
     return this.config as ExtendedMarketConfig;
   }
