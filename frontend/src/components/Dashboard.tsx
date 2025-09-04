@@ -72,7 +72,7 @@ export const ChartComponent = (props: {data: CandlestickData[], colors?: {backgr
 }
 
 const Dashboard: React.FC = () => {
-  const { connected, candlestickData, error, currentMarket, subscribeToMarket, loading } = useSocket();
+  const { connected, candlestickData, error, currentMarket, subscribeToMarket, fetchHistoricalData, loading } = useSocket();
 
   return (
     <div className="h-screen bg-gray-100 flex">
@@ -87,6 +87,7 @@ const Dashboard: React.FC = () => {
         currentMarket={currentMarket}
         error={error}
         loading={loading}
+        onTimeRangeSelect={fetchHistoricalData}
       />
     </div>
   );

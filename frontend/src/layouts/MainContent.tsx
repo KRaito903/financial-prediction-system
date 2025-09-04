@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChartComponent } from '../components/Dashboard';
+import TimeRangeSelector, { type TimeRange } from '../components/TimeRangeSelector';
 import type { MarketConfig } from '../components/MarketSelector';
 
 interface CandlestickData {
@@ -17,13 +18,15 @@ interface MainContentProps {
   currentMarket: MarketConfig | null;
   error: string | null;
   loading: boolean;
+  onTimeRangeSelect?: (timeRange: TimeRange) => void;
 }
 
 const MainContent: React.FC<MainContentProps> = ({
   candlestickData,
   currentMarket,
   error,
-  loading
+  loading,
+  onTimeRangeSelect
 }) => {
   return (
     <main className="flex-1 bg-gray-50 overflow-hidden">
@@ -55,12 +58,20 @@ const MainContent: React.FC<MainContentProps> = ({
             <h2 className="text-lg font-semibold text-gray-900">
               {currentMarket?.displayName || 'Select a Market'}
             </h2>
-            {loading && (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                <span className="text-sm text-gray-600">Loading data...</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {onTimeRangeSelect && (
+                <TimeRangeSelector 
+                  onTimeRangeSelect={onTimeRangeSelect}
+                  loading={loading}
+                />
+              )}
+              {loading && (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                  <span className="text-sm text-gray-600">Loading data...</span>
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="h-96">
