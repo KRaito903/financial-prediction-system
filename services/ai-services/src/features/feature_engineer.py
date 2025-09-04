@@ -51,12 +51,12 @@ class FeatureEngineer:
         price_df['sentiment_score'].fillna(0, inplace=True)
         return price_df
 
-    def transform(self, df: pd.DataFrame, news_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+    def transform(self, df: pd.DataFrame, news_df: Optional[pd.DataFrame] = None, symbol: Optional[str] = None) -> pd.DataFrame:
         df = df.copy()
         df.reset_index(inplace=True)  # Đảm bảo 'timestamp' là cột thường
 
         if 'symbol' not in df.columns:
-            df['symbol'] = "COIN"
+            df['symbol'] = symbol
 
         # Tích hợp sentiment data
         df = self._integrate_sentiment(df, news_df)

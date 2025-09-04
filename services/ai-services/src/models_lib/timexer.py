@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import torch
 from .base_model import BaseModel
 from pytorch_forecasting import TimeSeriesDataSet
@@ -11,24 +12,45 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_forecasting import TimeSeriesDataSet
 from pytorch_forecasting.metrics import QuantileLoss
 from pytorch_forecasting.models.timexer import TimeXer
+from src.models_lib.model_config.timexer_config import TimeXerConfig
+from src.models_lib.model_config.timexer_config import TimexerDataConfig
 
 class TimeXerModel(BaseModel):
-    
-    def __init__(self, **kagrs):
+
+    def __init__(self, config: TimeXerConfig):
         """
         Khởi tạo chỉ với các tham số, model thật sẽ được tạo lúc training.
         """
         # Bỏ index
-        self.data =  kagrs.get('data', None).reset_index(drop=False)
-        self.pred = kagrs.get('pred', None)
-        self.seq = kagrs.get('seq', None)
-        self.path = kagrs.get('path', None)
+        if config.data is not None:
+            self.data = config.data.reset_index(drop=False)
+        self.pred = config.pred
+        self.seq = config.seq
+        self.path = config.path
         self.model_path = None
 
-        if kagrs.get("model_path") is not None:
-            self.model_path = kagrs.get("model_path")
+        if config.model_path is not None:
+            self.model_path = config.model_path
         else:
             self._create_model()
+
+
+    def fetch_data_and_predict(self, config: TimexerDataConfig):
+        data = config.fetcher.fetch_data(
+        symbol=config.symbol,
+        interval=config.interval,
+        # do tính lag_7
+        start_str=(datetime.now()-timedelta(days=73)).strftime("%Y-%m-%d"))
+    
+        data_processed = config.engineer.transform(df=data, symbol=config.symbol)
+        data_processed = config.norm.transform(data_processed)
+        # Dự đoán
+        pred_timexer = self.predict(data_processed)
+        # Chuẩn hoá ngược về
+        pred_timexer['symbol'] = config.symbol
+        pred_timexer = config.norm.inverse_transform(pred_timexer)
+        return pred_timexer
+
 
     def _create_model(self):
         self.data["time_idx"] = (self.data["timestamp"] - self.data["timestamp"].min()).dt.days
@@ -78,8 +100,8 @@ class TimeXerModel(BaseModel):
         )
 
         checkpoint_callback = ModelCheckpoint(
-            dirpath=self.path + "/days/",
-            filename=f"timexer-{self.seq}-{self.pred}",
+            dirpath=self.path,
+            filename=f"timexer_pred_{self.pred}",
             monitor="val_loss",
             save_top_k=1,
             mode="min"
@@ -110,7 +132,7 @@ class TimeXerModel(BaseModel):
             reduce_on_plateau_patience=4,
         )
         self.model_path = checkpoint_callback.best_model_path
-        training.save(self.path + "/timexer_dataset.pkl")
+        training.save(self.path + f"/timexer_dataset_{self.pred}.pkl")
         print(f"Number of parameters in network: {self.model.size()/1e3:.1f}k")
 
     def train(self, **kwargs):
@@ -130,6 +152,7 @@ class TimeXerModel(BaseModel):
         Dự đoán trên dữ liệu mới (phải là DataFrame).
         """
         # Thêm các dòng mới với timestamp = ngày cuối + 1, +2, ..., +seq
+        data_to_predict = data_to_predict.copy().reset_index(drop=False)
         last_day = data_to_predict["timestamp"].max()
         new_rows = []
         for i in range(1, self.pred + 1):
@@ -137,10 +160,8 @@ class TimeXerModel(BaseModel):
             new_row["timestamp"] = last_day + pd.Timedelta(days=i)
             new_rows.append(new_row)
         data_to_predict = pd.concat([data_to_predict, pd.DataFrame(new_rows)], ignore_index=True)
-
-
         timexer_loaded = TimeXer.load_from_checkpoint(self.model_path)
-        training_loaded = torch.load(self.path + "/timexer_dataset.pkl", weights_only=False)
+        training_loaded = torch.load(self.path + f"timexer_dataset_{self.pred}.pkl", weights_only=False)
 
         min_timestamp_original = data_to_predict["timestamp"].min()
         data_to_predict["time_idx"] = (data_to_predict["timestamp"] - min_timestamp_original).dt.days

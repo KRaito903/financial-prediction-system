@@ -11,5 +11,9 @@ class BaseModel(ABC):
        pass
 
    @abstractmethod
+   def fetch_data_and_predict(self, **kwargs):
+       pass
+
+   @abstractmethod
    def evaluate(self, X_test: pd.DataFrame, y_test: pd.Series) -> float:
        pass

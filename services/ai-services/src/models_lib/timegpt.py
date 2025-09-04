@@ -1,11 +1,12 @@
+from src.models_lib.model_config.timegpt_config import TimeGPTConfig, TimeGPTDataConfig
 from src.models_lib.base_model import BaseModel
 import pandas as pd
 from nixtla import NixtlaClient
 
 class TimeGPTModel(BaseModel):
-    def __init__(self, **kargs):
-        self.api_key = kargs.get("api_key", None)
-        self.seq = kargs.get("seq", 6)
+    def __init__(self, config: TimeGPTConfig):
+        self.api_key = config.api_key
+        self.pred = config.pred
         if self.api_key is not None:
             self.client = NixtlaClient(api_key=self.api_key)
         else:
@@ -14,11 +15,21 @@ class TimeGPTModel(BaseModel):
     def train(self, X_train: pd.DataFrame, y_train: pd.Series):
         pass
 
+    def fetch_data_and_predict(self, config: TimeGPTDataConfig):
+        data = config.fetcher.fetch_data(
+            symbol=config.symbol,
+            interval=config.interval,
+            start_str=config.start_str
+        )
+        data_processed = config.engineer.transform(df=data, symbol=config.symbol)
+        pred = self.predict(data_processed)
+        return pred
+
     def predict(self, df: pd.DataFrame):
         df.rename(columns={"symbol": "unique_id"}, inplace=True)
         fcst = self.client.forecast(
             df=df,
-            h=self.seq,
+            h=self.pred,
             time_col='timestamp',
             target_col='close'
         )
