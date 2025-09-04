@@ -2,8 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { io, Socket } from 'socket.io-client';
 import { useApolloClient } from '@apollo/client';
 import type { ReactNode } from 'react';
-import { type MarketConfig } from '../components/MarketSelector';
-import { GET_LATEST_KLINES } from '../lib/queries';
+import type { MarketConfig, TimeRange } from '../types/chart';
+import { GET_LATEST_KLINES, GET_HISTORICAL_KLINES } from '../lib/queries';
 
 interface CandlestickData {
   time: number;
@@ -22,6 +22,7 @@ interface SocketContextType {
   error: string | null;
   currentMarket: MarketConfig | null;
   subscribeToMarket: (config: MarketConfig) => void;
+  fetchHistoricalData: (timeRange: TimeRange) => void;
   loading: boolean;
 }
 
@@ -59,7 +60,7 @@ const convertToGraphQLInterval = (interval: string): KlineInterval => {
 };
 
 const transformKlineToCandle = (kline: any): CandlestickData => ({
-  time: kline.openTime,
+  time: Math.floor(kline.openTime / 1000) + (7 * 60 * 60), // Convert from milliseconds to seconds and UTC to UTC+7
   open: parseFloat(kline.open),
   high: parseFloat(kline.high),
   low: parseFloat(kline.low),
@@ -94,7 +95,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           interval: currentMarket.interval
         });
       }
-
+      
       // 2. Fetch historical data via GraphQL
       const intervalEnum = convertToGraphQLInterval(config.interval);
       const { data } = await apolloClient.query({
@@ -106,6 +107,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         },
         fetchPolicy: 'network-only'
       });
+      
 
       // 3. Transform GraphQL data to candlestick format
       const historicalData = data.getLatestKlines.data.map(transformKlineToCandle);
@@ -136,6 +138,48 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setLoading(false);
     }
   }, [socket, connected, currentMarket, apolloClient])
+
+  const fetchHistoricalData = useCallback(async (timeRange: TimeRange) => {
+    if (!currentMarket) {
+      setError('No market selected');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const intervalEnum = convertToGraphQLInterval(currentMarket.interval);
+      const startTimeMs = timeRange.startTime.getTime();
+      const endTimeMs = timeRange.endTime.getTime();
+      
+      const { data } = await apolloClient.query({
+        query: GET_HISTORICAL_KLINES,
+        variables: {
+          symbol: currentMarket.symbol,
+          interval: intervalEnum,
+          startTime: startTimeMs,
+          endTime: endTimeMs,
+          limit: 1000
+        },
+        fetchPolicy: 'network-only'
+      });
+
+      // Transform GraphQL data to candlestick format
+      const historicalData = data.getHistoricalKlines.data.map(transformKlineToCandle);
+
+      // Set historical data
+      setCandlestickData(historicalData);
+      
+      console.log(`✅ Loaded ${historicalData.length} historical klines for ${currentMarket.symbol}`);
+      
+    } catch (error: any) {
+      console.error('Error fetching historical data:', error);
+      setError(`Failed to fetch historical data: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentMarket, apolloClient])
 
   useEffect(() => {
     // Connect to charting service Socket.io server
@@ -173,18 +217,25 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       if (currentMarket && data?.symbol !== currentMarket?.symbol) {
         return;
       }
+      
+      // Convert time from UTC to UTC+7 and ensure it's in seconds
+      const normalizedData = {
+        ...data,
+        time: Math.floor((data.time > 1000000000000 ? data.time / 1000 : data.time) + (7 * 60 * 60))
+      };
+      
       setCandlestickData(prev => {
         const updated = [...prev];
         
         // Check if this is an update to the last candlestick (same timestamp)
-        if (updated.length > 0 && updated[updated.length - 1].time === data.time) {
-          updated[updated.length - 1] = data; // Update existing candlestick
+        if (updated.length > 0 && updated[updated.length - 1].time === normalizedData.time) {
+          updated[updated.length - 1] = normalizedData; // Update existing candlestick
         } else {
-          if (updated[updated.length - 1] && data.time < updated[updated.length - 1].time) {
+          if (updated[updated.length - 1] && normalizedData.time < updated[updated.length - 1].time) {
             // Ignore out-of-order data
             return updated;
           }
-          updated.push(data); // Add new candlestick
+          updated.push(normalizedData); // Add new candlestick
         }
         
         // Keep only last 200 candlesticks to prevent memory issues
@@ -208,6 +259,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     error,
     currentMarket,
     subscribeToMarket,
+    fetchHistoricalData,
     loading
   };
 

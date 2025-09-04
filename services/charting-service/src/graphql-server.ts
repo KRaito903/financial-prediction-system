@@ -29,7 +29,6 @@ export async function startGraphQLServer() {
   if (validateInfluxDBConfig()) {
     try {
       const config = getInfluxDBConfig();
-      console.log(config);
       influxDB = new InfluxDBAPI(config);
       console.log('💾 InfluxDB initialized for persistent caching');
     } catch (error) {

@@ -145,9 +145,7 @@ export class BinanceAPI {
     if (this.influxDB) {
       try {
         const influxResult = await this.influxDB.queryKlines(symbol, interval, startTime, endTime, limit);
-        
         if (influxResult && influxResult.data.length > 0) {
-          // For queries with time ranges, check for gaps
           if (startTime && endTime) {
             const gaps = await this.influxDB.getDataGaps(symbol, interval, startTime, endTime);
             
@@ -181,9 +179,6 @@ export class BinanceAPI {
                 endTime
               };
             }
-          } else {
-            // For queries without time ranges (like getLatestKlines), return what we have
-            return influxResult;
           }
         } else {
         }

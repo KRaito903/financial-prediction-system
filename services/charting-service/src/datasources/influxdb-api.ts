@@ -80,7 +80,6 @@ export class InfluxDBAPI {
           .intField('closeTime', kline.closeTime)
           .timestamp(new Date(kline.openTime));
       });
-      console.log(points);
       writeAPI.writePoints(points);
       await writeAPI.close();
       
