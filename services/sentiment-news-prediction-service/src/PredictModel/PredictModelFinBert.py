@@ -1,6 +1,5 @@
 from .IPredictModel import IPredictModel
 import os
-import pandas as pd
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
