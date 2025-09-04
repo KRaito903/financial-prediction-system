@@ -27,9 +27,7 @@ class CSVLoader(DataRepository):
         combined_df = pd.concat(all_dfs)
         # Sắp xếp lại theo cả symbol và thời gian
         combined_df.sort_values(['symbol', 'timestamp'], inplace=True)
-        combined_df.reset_index(drop=True, inplace=True)
 
         combined_df['timestamp'] = pd.to_datetime(combined_df['timestamp'])
         combined_df.set_index('timestamp', inplace=True)
-
         return combined_df

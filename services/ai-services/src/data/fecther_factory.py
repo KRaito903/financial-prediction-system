@@ -1,6 +1,8 @@
 from .fetchers.base_fetcher import DataFetchStrategy
 from .fetchers.binace_fetcher import BinanceFetchStrategy
 from .fetchers.yahoo_fetcher import YahooFetchStrategy
+
+
 class FetcherFactory:
 
     _FACTORY_MAPPING = {

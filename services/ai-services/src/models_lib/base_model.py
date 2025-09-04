@@ -3,7 +3,7 @@ import pandas as pd
 
 class BaseModel(ABC):
    @abstractmethod
-   def train(self, X_train: pd.DataFrame, y_train: pd.Series):
+   def train(self, train_data: pd.DataFrame, val_data: pd.DataFrame):
        pass
 
    @abstractmethod

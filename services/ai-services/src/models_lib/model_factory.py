@@ -1,16 +1,15 @@
 from src.models_lib.base_model import BaseModel
-from src.models_lib.xgboots import XGBoots
-from src.models_lib.timegpt import TimeGPT
-from src.models_lib.timexer import TimeXer
+from src.models_lib.xgboots import XGBootsModel
+from src.models_lib.timegpt import TimeGPTModel
+from src.models_lib.timexer import TimeXerModel
 
 
 
 class ModelFactory:
-
     _MODEL_MAPPING = {
-    "XGBoots": XGBoots,
-    "TimeGPT": TimeGPT,
-    "TimeXer": TimeXer,
+    "XGBoots": XGBootsModel,
+    "TimeGPT": TimeGPTModel,
+    "TimeXer": TimeXerModel,
     }
 
     @staticmethod

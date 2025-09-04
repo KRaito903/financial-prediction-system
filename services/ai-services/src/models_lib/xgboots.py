@@ -1,7 +1,7 @@
 from src.models_lib.base_model import BaseModel
 import pandas as pd
 
-class XGBoots(BaseModel):
+class XGBootsModel(BaseModel):
     def __init__(self):
         super().__init__()
         self.model = None
