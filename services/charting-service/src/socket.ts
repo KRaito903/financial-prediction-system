@@ -5,6 +5,10 @@ import { wsManager } from "./websocket-manager";
 const recentCandlesticks: Array<{time: number, open: number, high: number, low: number, close: number}> = [];
 const MAX_HISTORY = 100; // Keep last 100 candlesticks
 
+// Store recent trade data for new connections
+const recentTrades: Array<{symbol: string, price: number, amount: number, time: number, isBuyerMaker: boolean}> = [];
+const MAX_TRADE_HISTORY = 30; // Keep last 30 trades
+
 const io = new Server(3000, {
   cors: {
     origin: "*",
@@ -29,6 +33,14 @@ io.on('connection', (socket) => {
     wsManager.unsubscribeFromMarket(symbol, interval);
   })
 
+  socket.on('subscribe_trades', ({symbol}) => {
+    wsManager.subscribeToTrades(symbol);
+  })
+
+  socket.on('unsubscribe_trades', ({symbol}) => {
+    wsManager.unsubscribeFromTrades(symbol);
+  })
+
 });
 
 // Function to broadcast candlestick data
@@ -43,6 +55,20 @@ export const broadcastCandlestick = (candlestick: {time: number, open: number, h
   
   // Broadcast to all connected clients
   io.emit('candlestick', candlestick);
+};
+
+// Function to broadcast trade data
+export const broadcastTrade = (trade: {symbol: string, price: number, amount: number, time: number, isBuyerMaker: boolean}) => {
+  // Add to recent trades buffer
+  recentTrades.push(trade);
+  
+  // Keep only last MAX_TRADE_HISTORY trades
+  if (recentTrades.length > MAX_TRADE_HISTORY) {
+    recentTrades.shift();
+  }
+  
+  // Broadcast to all connected clients
+  io.emit('trade', trade);
 };
 
 export { io };
