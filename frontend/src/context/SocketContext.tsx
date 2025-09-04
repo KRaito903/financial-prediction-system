@@ -2,8 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { io, Socket } from 'socket.io-client';
 import { useApolloClient } from '@apollo/client';
 import type { ReactNode } from 'react';
-import { type MarketConfig } from '../components/MarketSelector';
-import { type TimeRange } from '../components/TimeRangeSelector';
+import type { MarketConfig, TimeRange } from '../types/chart';
 import { GET_LATEST_KLINES, GET_HISTORICAL_KLINES } from '../lib/queries';
 
 interface CandlestickData {

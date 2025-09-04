@@ -16,12 +16,7 @@ import {
   PopoverTrigger,
 } from "./ui/popover";
 import { fetchTradingPairs, type TradingPair } from '../lib/api';
-
-export interface MarketConfig {
-  symbol: string;
-  interval: string;
-  displayName: string;
-}
+import type { MarketConfig } from '../types/chart';
 
 interface MarketSelectorProps {
   currentConfig: MarketConfig;

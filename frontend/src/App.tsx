@@ -13,12 +13,12 @@ import BacktestPage from "./route/backtest/page";
 import { Toaster } from "react-hot-toast";
 // import { AuthProvider } from "./context/AuthContext";
 import { apolloClient } from "./lib/apollo-client";
-import { SocketProvider } from './context/SocketContext';
+import { MultiChartProvider } from './context/MultiChartContext';
 
 function App() {
 	return (
 		<ApolloProvider client={apolloClient}>
-			<SocketProvider>
+			<MultiChartProvider>
         {/* <AuthProvider> */}
   				<Router>
   					<Routes>
@@ -48,7 +48,7 @@ function App() {
 					<Toaster />
   				</Router>
 			  {/* </AuthProvider> */}
-      </SocketProvider>
+      </MultiChartProvider>
 		</ApolloProvider>
 	);
 }

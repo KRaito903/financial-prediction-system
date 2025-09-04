@@ -1,4 +1,4 @@
-import { type MarketConfig } from "../components/MarketSelector";
+import type { MarketConfig } from "../types/chart";
 
 export interface MarketEndpoint {
   websocket: string;

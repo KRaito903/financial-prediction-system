@@ -7,10 +7,7 @@ import { Label } from './ui/label';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
-export interface TimeRange {
-  startTime: Date;
-  endTime: Date;
-}
+import type { TimeRange } from '../types/chart';
 
 interface TimeRangeSelectorProps {
   onTimeRangeSelect: (timeRange: TimeRange) => void;
