@@ -22,7 +22,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS configuration - more comprehensive for Apollo Router
+# CORS configuration - more comprehensive for Apollo Router and frontend
 origins = [
     "http://localhost:4000",  # Apollo Router
     "http://localhost:5173",  # Frontend
@@ -35,9 +35,9 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
         "Content-Type", 
         "Authorization", 
@@ -45,6 +45,9 @@ app.add_middleware(
         "X-Requested-With",
         "Accept",
         "Origin",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Headers",
+        "Access-Control-Allow-Methods",
     ],
 )
 
@@ -59,7 +62,8 @@ app.include_router(graphql_router, prefix="/graphql")
 @app.get("/graphql/sdl")
 async def get_sdl():
     """Return the SDL schema for Apollo Federation."""
-    return {"sdl": schema.as_str()}
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(schema.as_str(), media_type="text/plain")
 
 @app.get("/health")
 async def health_check():
