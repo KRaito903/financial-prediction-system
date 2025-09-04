@@ -20,33 +20,34 @@ function App() {
 		<ApolloProvider client={apolloClient}>
 			<SocketProvider>
 				<AuthProvider>
-				<Router>
-					<Routes>
-						<Route path="/login" element={<Login />} />
-						<Route path="/signup" element={<Signup />} />
-						<Route
-							path="/dashboard"
-							element={
-								// <ProtectedRoute>
-								<Dashboard />
-								// {/* </ProtectedRoute> */}
-							}
-						/>
-						<Route
-							path="/backtest"
-							element={
-								// <ProtectedRoute>
-									<BacktestPage />
-								// </ProtectedRoute>
-							}
-						/>
-						<Route
-							path="/"
-							element={<Navigate to="/dashboard" replace />}
-						/>
-					</Routes>
-					<Toaster />
-				</Router>
+					<Router>
+						<Routes>
+							<Route path="/login" element={<Login />} />
+							<Route path="/signup" element={<Signup />} />
+							<Route
+								path="/dashboard"
+								element={
+									// <ProtectedRoute>
+									<Dashboard />
+									// {/* </ProtectedRoute> */}
+								}
+							/>
+							<Route
+								path="/backtest"
+								element={
+									<ProtectedRoute>
+										<BacktestPage />
+										//{" "}
+									</ProtectedRoute>
+								}
+							/>
+							<Route
+								path="/"
+								element={<Navigate to="/dashboard" replace />}
+							/>
+						</Routes>
+						<Toaster />
+					</Router>
 				</AuthProvider>
 			</SocketProvider>
 		</ApolloProvider>

@@ -39,7 +39,6 @@ const HistoricalData: React.FC<HistoricalDataProps> = ({
 	onBacktestSelect,
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
-
 	const { data, loading, error } = useQuery(FETCH_BACKTEST_HISTORY, {
 		variables: {
 			input: {
