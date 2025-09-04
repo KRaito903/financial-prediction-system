@@ -35,9 +35,9 @@ function App() {
   						<Route
 							path="/backtest"
 							element={
-								<ProtectedRoute>
+								// <ProtectedRoute>
 									<BacktestPage />
-								</ProtectedRoute>
+								// {/* </ProtectedRoute> */}
 							}
 						/>
 						<Route

@@ -96,10 +96,27 @@ services:
           ignore:
             - node_modules/
 
+  backtest:
+    build:
+      context: ./services/backtest
+      dockerfile: Dockerfile
+    container_name: backtest
+    ports:
+      - "5050:5050"
+    env_file:
+      - ./services/backtest/.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5050/health', timeout=10)"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+
   apollo-service-router:
     depends_on:
       - users-service
       - charting-service
+      - backtest
     image: ghcr.io/apollographql/router:v2.5.0
     container_name: apollo-service-router
     ports:
@@ -135,22 +152,6 @@ services:
   #     - DATABASE_URL=postgresql://$SENTIMENT_DATABASE_POSTGRES_USER:$SENTIMENT_DATABASE_POSTGRES_PASSWORD@sentiment-service-database/$SENTIMENT_DATABASE_DATABASE
   #     - GEMINI_MODEL=gemini-2.0-flash
   #     - GEMINI_API_KEY=$SENTIMENT_SERVICE_GEMINI_API_KEY
-
-  # backtest-service:
-  #   build:
-  #     context: ./services/backtest
-  #     dockerfile: Dockerfile
-  #   container_name: backtest-service
-  #   ports:
-  #     - "5050:5050"
-  #   env_file:
-  #     - ./services/backtest/.env
-  #   healthcheck:
-  #     test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5050/health', timeout=10)"]
-  #     interval: 60s
-  #     timeout: 30s
-  #     retries: 3
-  #     start_period: 30s
 
   influxdb2:
     image: influxdb:2
