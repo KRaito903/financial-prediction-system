@@ -7,7 +7,7 @@ from typing import Dict, Any
 import pandas as pd
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
-from lightning.pytorch.tuner import Tuner
+# from lightning.pytorch.tuner import Tuner
 from pytorch_forecasting import TimeSeriesDataSet
 from pytorch_forecasting.metrics import QuantileLoss
 from pytorch_forecasting.models.timexer import TimeXer
@@ -18,11 +18,13 @@ class TimeXerModel(BaseModel):
         """
         Khởi tạo chỉ với các tham số, model thật sẽ được tạo lúc training.
         """
-        self.data =  kagrs.get('data', None)
+        # Bỏ index
+        self.data =  kagrs.get('data', None).reset_index(drop=False)
         self.pred = kagrs.get('pred', None)
         self.seq = kagrs.get('seq', None)
         self.path = kagrs.get('path', None)
         self.model_path = None
+
         if kagrs.get("model_path") is not None:
             self.model_path = kagrs.get("model_path")
         else:
@@ -31,8 +33,8 @@ class TimeXerModel(BaseModel):
     def _create_model(self):
         self.data["time_idx"] = (self.data["timestamp"] - self.data["timestamp"].min()).dt.days
 
-        max_encoder_length = self.pred   # số ngày nhìn lại
-        max_prediction_length = self.seq  # số ngày dự đoán tới
+        max_encoder_length = self.seq  # số ngày nhìn lại
+        max_prediction_length = self.pred  # số ngày dự đoán tới
 
         training_cutoff = self.data["time_idx"].max() - max_prediction_length
 
@@ -60,7 +62,6 @@ class TimeXerModel(BaseModel):
             max_encoder_length=max_encoder_length,
             max_prediction_length=max_prediction_length,
         )
-        training.save(self.path + "/timexer_dataset.pkl")
 
         # 3. Train/Val dataloader
         validation = TimeSeriesDataSet.from_dataset(
@@ -73,22 +74,22 @@ class TimeXerModel(BaseModel):
 
         # 4. Trainer với EarlyStopping + Save Model
         early_stop_callback = EarlyStopping(
-            monitor="val_loss", min_delta=1e-4, patience=3, verbose=False, mode="min"
+            monitor="val_loss", min_delta=1e-4, patience=10, verbose=False, mode="min"
         )
 
         checkpoint_callback = ModelCheckpoint(
             dirpath=self.path + "/days/",
-            filename=f"timexer-{self.pred}-{self.seq}",
+            filename=f"timexer-{self.seq}-{self.pred}",
             monitor="val_loss",
             save_top_k=1,
             mode="min"
         )
 
         self.trainer = pl.Trainer(
-            max_epochs=30,
+            max_epochs=100,
             accelerator="auto",
             gradient_clip_val=0.1,
-            limit_train_batches=30,
+            limit_train_batches=32,
             callbacks=[early_stop_callback, checkpoint_callback],
         )
 
@@ -97,18 +98,19 @@ class TimeXerModel(BaseModel):
             training,
             context_length=max_encoder_length,
             prediction_length=max_prediction_length,
-            hidden_size=64,
+            hidden_size=256,
             n_heads=4,
-            e_layers=2,
-            d_ff=256,
+            e_layers=3,
+            d_ff=512,
             dropout=0.1,
-            learning_rate=0.03,
+            learning_rate=0.01,
             output_size=7,   # quantile loss => cần output_size=7
             loss=QuantileLoss(),
             log_interval=2,
             reduce_on_plateau_patience=4,
         )
         self.model_path = checkpoint_callback.best_model_path
+        training.save(self.path + "/timexer_dataset.pkl")
         print(f"Number of parameters in network: {self.model.size()/1e3:.1f}k")
 
     def train(self, **kwargs):
@@ -130,7 +132,7 @@ class TimeXerModel(BaseModel):
         # Thêm các dòng mới với timestamp = ngày cuối + 1, +2, ..., +seq
         last_day = data_to_predict["timestamp"].max()
         new_rows = []
-        for i in range(1, self.seq + 1):
+        for i in range(1, self.pred + 1):
             new_row = data_to_predict.iloc[-1].copy()
             new_row["timestamp"] = last_day + pd.Timedelta(days=i)
             new_rows.append(new_row)
@@ -155,7 +157,7 @@ class TimeXerModel(BaseModel):
         pred_values = predictions[0].detach().cpu().numpy()
 
         # Lấy các timestamp mới đã thêm vào
-        future_timestamps = data_to_predict["timestamp"].iloc[-self.seq:].reset_index(drop=True)
+        future_timestamps = data_to_predict["timestamp"].iloc[-self.pred:].reset_index(drop=True)
 
         # Trả về DataFrame với các cột: timestamp, close
         result_df = pd.DataFrame({
