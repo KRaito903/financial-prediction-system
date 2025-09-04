@@ -22,12 +22,28 @@ from ..models.backtest_model import (
 # Protocol allows custom mappers to be used if needed, only requirement is to implement _doc_to_response
 # Can't be instantiated directly, must be subclassed or replaced with custom implementation
 class DocumentMapper(Protocol):
+    def _doc_to_model(self, doc: dict) -> BacktestPydanticResult:
+        """Protocol for a document mapper. Defines the interface for a class responsible for mapping raw MongoDB documents to Pydantic models."""
+        return BacktestPydanticResult(**doc)
+    
     def _doc_to_response(self, doc: dict) -> BacktestResponse:
         """Protocol for a document mapper. Defines the interface for a class responsible for mapping raw MongoDB documents to Pydantic models."""
         return BacktestResponse(**doc)
 
 
 class BacktestMapper:
+    def _doc_to_model(self, doc: dict) -> BacktestPydanticResult:
+        """Map a raw Mongo document to the BacktestPydanticResult Pydantic model."""
+        if not doc:
+            raise ValueError("Document not found")
+
+        # Convert ObjectId to string for the id field
+        if "_id" in doc:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+
+        return BacktestPydanticResult(**doc)
+
     def _doc_to_response(self, doc: dict) -> BacktestResponse:
         """Map a raw Mongo document to the BacktestResponse Pydantic model."""
         if not doc:
@@ -126,6 +142,17 @@ class BacktestDatabase:
         if not doc:
             return None
         return self.mapper._doc_to_response(doc)
+
+    async def get_backtest_model_by_id(self, backtest_id: str) -> Optional[BacktestPydanticResult]:
+        """Get a specific backtest by ID returning BacktestPydanticResult."""
+        try:
+            result = await self.collection.find_one({"_id": ObjectId(backtest_id)})
+            if result:
+                return self.mapper._doc_to_model(result)
+            return None
+        except Exception as e:
+            print(f"Error fetching backtest by ID: {e}")
+            return None
 
     async def list_backtests_for_user(self, user_id: str) -> List[BacktestResponse]:
         """

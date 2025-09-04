@@ -1,0 +1,114 @@
+schema @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"]) {
+  query: Query
+  mutation: Mutation
+}
+
+# Input types
+input OHLCVFetchInput {
+  symbol: String!
+  interval: String! = "1d"
+  limit: Int! = 1000
+  startDate: String
+  endDate: String
+}
+
+input MACrossoverParamsInput {
+  fast: Int! = 20
+  slow: Int! = 50
+}
+
+input BacktestInput {
+  userId: String!
+  symbol: String!
+  fetchInput: OHLCVFetchInput!
+  maCrossoverParams: MACrossoverParamsInput
+  modelFile: String
+  modelScalerFile: String
+  period: String! = "1D"
+  initCash: Float! = 10000.0
+  fees: Float! = 0.001
+  slippage: Float! = 0.001
+  fixedSize: Boolean
+  percentSize: Float
+  useFallback: Boolean! = true
+}
+
+input HistoricalDataInput {
+  userId: String!
+}
+
+# Custom scalar
+scalar DateTime
+
+# Regular types (non-federated)
+type ModelInfo {
+  filename: String!
+  filePath: String!
+  relativePath: String!
+  fileSize: Int!
+  createdTime: Float!
+  modifiedTime: Float!
+}
+
+type CoinList {
+  coins: [String!]
+}
+
+type OHLCVFetchResult {
+  Date: String!
+  Open: Float!
+  High: Float!
+  Low: Float!
+  Close: Float!
+  Volume: Float!
+}
+
+type BacktestMetrics {
+  strategyName: String!
+  totalReturn: Float!
+  sharpeRatio: Float!
+  maxDrawdown: Float!
+  winRate: Float!
+}
+
+type PortfolioValue {
+  Date: String!
+  portfolioValue: Float!
+  signal: String!
+}
+
+type MAStrategy {
+  fastMaPeriod: Int!
+  slowMaPeriod: Int!
+}
+
+# Federated entity
+type BacktestResult @key(fields: "id") {
+  id: String!
+  symbol: String!
+  status: String!
+  strategy: MAStrategy
+  data: [PortfolioValue!]!
+  metrics: BacktestMetrics!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  winningTrades: Int!
+  losingTrades: Int!
+  totalTrades: Int!
+  profitFactor: Float
+}
+
+# Root types
+type Query {
+  health: String!
+  fetchOhlcv(input: OHLCVFetchInput!): [OHLCVFetchResult!]!
+  fetchCoinList: CoinList!
+  fetchBacktestHistory(input: HistoricalDataInput!): [BacktestResult!]
+  getUserModels(userId: String!): [ModelInfo!]!
+}
+
+type Mutation {
+  runVectorizedBacktest(input: BacktestInput!): BacktestResult!
+  runEventDrivenBacktest(input: BacktestInput!): BacktestResult!
+  runMlBacktest(input: BacktestInput!): BacktestResult!
+}
