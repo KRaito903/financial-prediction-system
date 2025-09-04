@@ -8,7 +8,8 @@ import type {
   MarketConfig, 
   ChartConfig, 
   ViewMode, 
-  TimeRange 
+  TimeRange,
+  TradeData
 } from '../types/chart';
 
 interface MultiChartContextType {
@@ -71,6 +72,7 @@ const createDefaultChart = (id: string): ChartConfig => ({
   id,
   market: null,
   candlestickData: [],
+  tradeData: [],
   loading: false,
   error: null,
 });
@@ -115,6 +117,12 @@ export const MultiChartProvider: React.FC<MultiChartProviderProps> = ({ children
           symbol: targetChart.market.symbol,
           interval: targetChart.market.interval
         });
+        // Also unsubscribe from trades for single chart mode
+        if (viewMode === 'single' && targetChartId === selectedChartId) {
+          socket.emit('unsubscribe_trades', {
+            symbol: targetChart.market.symbol
+          });
+        }
       }
       
       // Fetch historical data via GraphQL
@@ -137,10 +145,18 @@ export const MultiChartProvider: React.FC<MultiChartProviderProps> = ({ children
         symbol: config.symbol,
         interval: config.interval
       });
+      
+      // Subscribe to trades for single chart mode
+      if (viewMode === 'single' && targetChartId === selectedChartId) {
+        socket.emit('subscribe_trades', {
+          symbol: config.symbol
+        });
+      }
 
       updateChart(targetChartId, {
         market: config,
         candlestickData: historicalData,
+        tradeData: [], // Reset trade data when switching markets
         loading: false
       });
       
@@ -159,7 +175,8 @@ export const MultiChartProvider: React.FC<MultiChartProviderProps> = ({ children
       
       updateChart(targetChartId, {
         market: config,
-        candlestickData: []
+        candlestickData: [],
+        tradeData: [] // Reset trade data when switching markets
       });
     }
   }, [socket, connected, selectedChartId, charts, apolloClient, updateChart]);
@@ -220,13 +237,29 @@ export const MultiChartProvider: React.FC<MultiChartProviderProps> = ({ children
   }, [charts, socket, connected, subscribeToMarket]);
 
   const handleViewModeChange = useCallback(async (mode: ViewMode) => {
+    const previousMode = viewMode;
     setViewMode(mode);
     
-    // If switching from multi to single, reset to real-time
-    if (mode === 'single') {
+    if (!socket || !connected) return;
+    
+    // Handle trade subscriptions based on mode change
+    const selectedChart = charts.find(c => c.id === selectedChartId);
+    
+    if (mode === 'single' && previousMode === 'multi' && selectedChart?.market) {
+      // Switching to single mode - subscribe to trades for selected chart
+      socket.emit('subscribe_trades', {
+        symbol: selectedChart.market.symbol
+      });
       await resetToRealTime();
+    } else if (mode === 'multi' && previousMode === 'single' && selectedChart?.market) {
+      // Switching to multi mode - unsubscribe from trades
+      socket.emit('unsubscribe_trades', {
+        symbol: selectedChart.market.symbol
+      });
+      // Clear trade data from all charts
+      setCharts(prev => prev.map(chart => ({ ...chart, tradeData: [] })));
     }
-  }, [resetToRealTime]);
+  }, [viewMode, socket, connected, charts, selectedChartId, resetToRealTime]);
 
   useEffect(() => {
     // Connect to charting service Socket.io server
@@ -295,6 +328,27 @@ export const MultiChartProvider: React.FC<MultiChartProviderProps> = ({ children
           ...chart,
           candlestickData: updated.slice(-200)
         };
+      }));
+    });
+
+    // Handle real-time trade updates
+    newSocket.on('trade', (data: TradeData) => {
+      // Update trade data only for charts in single mode that match the symbol
+      setCharts(prev => prev.map(chart => {
+        if (!chart.market || data?.symbol !== chart.market?.symbol) {
+          return chart;
+        }
+        
+        // Only add trade data if this chart is selected in single mode
+        if (viewMode === 'single' && chart.id === selectedChartId) {
+          const updatedTrades = [data, ...chart.tradeData].slice(0, 30); // Keep only last 30 trades
+          return {
+            ...chart,
+            tradeData: updatedTrades
+          };
+        }
+        
+        return chart;
       }));
     });
 
