@@ -26,6 +26,7 @@ interface MarketSelectorProps {
 
 
 const TIME_INTERVALS = [
+  { value: '1s', label: '1s' },
   { value: '1m', label: '1m' },
   { value: '5m', label: '5m' },
   { value: '15m', label: '15m' },

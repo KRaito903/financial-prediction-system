@@ -3,6 +3,7 @@ import { ChartComponent } from '../components/Dashboard';
 import TimeRangeSelector from '../components/TimeRangeSelector';
 import ChartViewToggle from '../components/ChartViewToggle';
 import MultiChartView from '../components/MultiChartView';
+import TradeTable from '../components/TradeTable';
 import { useMultiChart } from '../context/MultiChartContext';
 import type { TimeRange } from '../types/chart';
 
@@ -83,30 +84,42 @@ const MainContent: React.FC<MainContentProps> = () => {
                 </div>
               </div>
               
-              <div className="h-96">
-                {selectedChart?.candlestickData.length ? (
-                  <ChartComponent 
-                    data={selectedChart.candlestickData}
-                    height={384}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-gray-50 rounded">
-                    <div className="text-center">
-                      {selectedChart?.loading ? (
-                        <>
-                          <div className="animate-pulse">
-                            <div className="h-32 w-full bg-gray-200 rounded mb-4"></div>
-                          </div>
-                          <p className="text-gray-500">Loading chart data...</p>
-                        </>
-                      ) : (
-                        <p className="text-gray-500">
-                          {selectedChart?.market ? 'No data available' : 'Select a market to view data'}
-                        </p>
-                      )}
+              {/* Chart and Trade Table Split View */}
+              <div className="flex flex-col h-96">
+                {/* Chart Section - Takes half the height */}
+                <div className="flex-1 mb-4">
+                  {selectedChart?.candlestickData.length ? (
+                    <ChartComponent 
+                      data={selectedChart.candlestickData}
+                      height={192} // Half of original 384px
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full bg-gray-50 rounded">
+                      <div className="text-center">
+                        {selectedChart?.loading ? (
+                          <>
+                            <div className="animate-pulse">
+                              <div className="h-32 w-full bg-gray-200 rounded mb-4"></div>
+                            </div>
+                            <p className="text-gray-500">Loading chart data...</p>
+                          </>
+                        ) : (
+                          <p className="text-gray-500">
+                            {selectedChart?.market ? 'No data available' : 'Select a market to view data'}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                
+                {/* Trade Table Section - Takes half the height */}
+                <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+                  <TradeTable 
+                    trades={selectedChart?.tradeData || []} 
+                    loading={selectedChart?.loading || false}
+                  />
+                </div>
               </div>
             </>
           ) : (

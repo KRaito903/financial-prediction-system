@@ -14,10 +14,19 @@ export interface MarketConfig {
   displayName: string;
 }
 
+export interface TradeData {
+  symbol: string;
+  price: number;
+  amount: number;
+  time: number;
+  isBuyerMaker: boolean;
+}
+
 export interface ChartConfig {
   id: string;
   market: MarketConfig | null;
   candlestickData: CandlestickData[];
+  tradeData: TradeData[];
   loading: boolean;
   error: string | null;
 }
