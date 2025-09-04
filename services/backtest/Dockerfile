@@ -66,8 +66,8 @@ EXPOSE 5050
 
 # Health check with better error handling
 # Updated to handle potential connection issues more gracefully
-HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5050/health', timeout=10)" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:5050/health || exit 1
 
 # Default command to run the application
-CMD ["python", "run.py", "prod", "--host", "0.0.0.0", "--port", "5050"]
+CMD ["python", "-m", "uvicorn", "src.backtest_API:app", "--host", "0.0.0.0", "--port", "5050"]

@@ -15,68 +15,80 @@ logger = logging.getLogger(__name__)
 # Initialize scheduler
 scheduler = AsyncIOScheduler()
 
-# Setup GraphQL router
-graphql_app = GraphQLRouter(
-    schema,
-    graphiql=True,
+# Initialize app
+app = FastAPI(
+    title="Financial Backtest Service",
+    description="Apollo Federation subgraph for financial backtesting services",
+    version="1.0.0",
 )
 
-app = FastAPI()
-app.include_router(graphql_app, prefix="/graphql")
-app.include_router(upload_router)
-
+# CORS configuration - more comprehensive for Apollo Router
 origins = [
-    "http://localhost",
-    "http://localhost:5173",
-    "http://localhost:5050",  # development
-    "http://127.0.0.1:5050",  # production
-    "http://localhost:3000",  # frontend dev
+    "http://localhost:4000",  # Apollo Router
+    "http://localhost:5173",  # Frontend
+    "http://frontend:5173",   # Frontend in Docker
+    "http://localhost:5050",  # This service
+    "http://127.0.0.1:5050",  # This service
+    "http://backtest:5050",   # This service in Docker
+    "https://studio.apollographql.com",  # Apollo Studio
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=[
+        "Content-Type", 
+        "Authorization", 
+        "Apollo-Require-Preflight",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+    ],
 )
 
+# Include upload routes
+app.include_router(upload_router)
+
+# Add GraphQL router
+graphql_router = GraphQLRouter(schema, graphiql=True)
+app.include_router(graphql_router, prefix="/graphql")
+
+# Add SDL endpoint for Apollo Federation
+@app.get("/graphql/sdl")
+async def get_sdl():
+    """Return the SDL schema for Apollo Federation."""
+    return {"sdl": schema.as_str()}
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok"}
+    return {"status": "ok", "service": "backtest-service"}
 
-
-# Background task to clear unused cache files
-async def cleanup_unused_model_files():
-    try:
-        logger.info("Starting scheduled cleanup of unused model files")
-        await file_cacher.remove_unused_caches()
-        logger.info("Completed cleanup of unused model files")
-    except Exception as e:
-        logger.error(f"Error during model file cleanup: {str(e)}")
-
-
-# Startup and shutdown events for the scheduler
+# Lifecycle events
 @app.on_event("startup")
-async def start_scheduler():
-    # Schedule cache cleanup to run every 24 hours
-    scheduler.add_job(
-        cleanup_unused_model_files,
-        IntervalTrigger(hours=24),
-        id="cleanup_unused_models",
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info("Started scheduler for model file cleanup")
-
+async def startup_event():
+    """Startup event handler."""
+    logger.info("Starting backtest service...")
+    
+    # Start the scheduler for file cache cleanup
+    if not scheduler.running:
+        scheduler.add_job(
+            file_cacher.remove_unused_caches,
+            IntervalTrigger(hours=24),
+            id="cleanup_cache",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("Started file cache cleanup scheduler")
 
 @app.on_event("shutdown")
-async def stop_scheduler():
-    scheduler.shutdown()
-    logger.info("Stopped scheduler for model file cleanup")
-
-
-# To run the FastAPI server, use the command: uvicorn src.services.backtestAPI:app --reload --port 5050
-# Or use the run.py script for more options
+async def shutdown_event():
+    """Shutdown event handler."""
+    logger.info("Shutting down backtest service...")
+    
+    # Stop the scheduler
+    if scheduler.running:
+        scheduler.shutdown()
+        logger.info("Stopped file cache cleanup scheduler")
