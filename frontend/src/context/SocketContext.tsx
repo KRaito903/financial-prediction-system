@@ -94,7 +94,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           interval: currentMarket.interval
         });
       }
-
+      
       // 2. Fetch historical data via GraphQL
       const intervalEnum = convertToGraphQLInterval(config.interval);
       const { data } = await apolloClient.query({
@@ -106,6 +106,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         },
         fetchPolicy: 'network-only'
       });
+      
 
       // 3. Transform GraphQL data to candlestick format
       const historicalData = data.getLatestKlines.data.map(transformKlineToCandle);

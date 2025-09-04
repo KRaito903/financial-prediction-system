@@ -90,3 +90,79 @@ class ModelAPI {
 }
 
 export const modelAPI = new ModelAPI();
+
+// Binance API types and functions
+export interface BinanceSymbol {
+  symbol: string;
+  status: string;
+  baseAsset: string;
+  baseAssetPrecision: number;
+  quoteAsset: string;
+  quotePrecision: number;
+  quoteAssetPrecision: number;
+  baseCommissionPrecision: number;
+  quoteCommissionPrecision: number;
+  orderTypes: string[];
+  icebergAllowed: boolean;
+  ocoAllowed: boolean;
+  quoteOrderQtyMarketAllowed: boolean;
+  allowTrailingStop: boolean;
+  cancelReplaceAllowed: boolean;
+  isSpotTradingAllowed: boolean;
+  isMarginTradingAllowed: boolean;
+  filters: Record<string, unknown>[];
+  permissions: string[];
+  permissionSets: string[][];
+  defaultSelfTradePreventionMode: string;
+  allowedSelfTradePreventionModes: string[];
+}
+
+export interface BinanceExchangeInfo {
+  timezone: string;
+  serverTime: number;
+  rateLimits: Record<string, unknown>[];
+  exchangeFilters: Record<string, unknown>[];
+  symbols: BinanceSymbol[];
+}
+
+export interface TradingPair {
+  value: string;
+  label: string;
+}
+
+const BINANCE_BASE_URL = 'https://api.binance.com';
+
+export async function fetchTradingPairs(): Promise<TradingPair[]> {
+  try {
+    const response = await fetch(`${BINANCE_BASE_URL}/api/v3/exchangeInfo`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch exchange info: ${response.status}`);
+    }
+
+    const data: BinanceExchangeInfo = await response.json();
+    
+    // Filter for USDT pairs that are actively trading
+    const usdtPairs = data.symbols
+      .filter(symbol => 
+        symbol.quoteAsset === 'USDT' && 
+        symbol.status === 'TRADING' &&
+        symbol.isSpotTradingAllowed
+      )
+      .map(symbol => ({
+        value: `${symbol.baseAsset}/USDT`,
+        label: `${symbol.baseAsset}/USDT`
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    return usdtPairs;
+  } catch (error) {
+    console.error('Error fetching trading pairs:', error);
+    // Return fallback pairs if API fails
+    return [
+      { value: 'BTC/USDT', label: 'BTC/USDT' },
+      { value: 'ETH/USDT', label: 'ETH/USDT' },
+      { value: 'BNB/USDT', label: 'BNB/USDT' },
+    ];
+  }
+}

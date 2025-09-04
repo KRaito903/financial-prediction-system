@@ -11,13 +11,13 @@ import Dashboard from "./components/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BacktestPage from "./route/backtest/page";
 import { Toaster } from "react-hot-toast";
-import { AuthProvider } from "./context/AuthContext";
-import { client } from "./lib/apollo-client";
+// import { AuthProvider } from "./context/AuthContext";
+import { apolloClient } from "./lib/apollo-client";
 import { SocketProvider } from './context/SocketContext';
 
 function App() {
 	return (
-		<ApolloProvider client={client}>
+		<ApolloProvider client={apolloClient}>
 			<SocketProvider>
         {/* <AuthProvider> */}
   				<Router>
