@@ -57,7 +57,7 @@ class WebSocketManager {
       return;
     }
 
-    const wsUrl = `wss://fstream.binance.com/ws/${streamKey}`;
+    const wsUrl = `wss://stream.binance.com:9443/ws/${streamKey}`;
     const ws = new WebSocket(wsUrl);
 
     const stream: MarketStream = {
@@ -80,7 +80,7 @@ class WebSocketManager {
     ws.on('message', (data) => {
       try {
         const message = JSON.parse(data.toString());
-        if (message.e === 'kline' && message.x === true) { // Ensure kline is closed
+        if (message.e === 'kline' && message.k.x === true) { // Ensure kline is closed
           const kline = message.k;
           const candlestick = {
             time: kline.t,
