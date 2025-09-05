@@ -23,3 +23,17 @@ timexer_env/
 checkpoints/
 test_results/
 results/
+.env*
+.DS_Store
+npm-debug.log
+yarn-error.log
+router/
+
+# Sentiment news service
+services/sentiment-news-prediction-service/.venv
+services/sentiment-news-prediction-service/model-finbert-sentiment/
+
+**/venv
+**/.vscode
+**/__pycache__/
+**/.ruff_cache__/

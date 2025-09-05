@@ -1,0 +1,62 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.9", import: ["@key"])
+
+type Kline {
+  openTime: Float!
+  open: String!
+  high: String!
+  low: String!
+  close: String!
+  volume: String!
+  closeTime: Float!
+  quoteAssetVolume: String!
+  trades: Int!
+  takerBuyBaseAssetVolume: String!
+  takerBuyQuoteAssetVolume: String!
+  symbol: String!
+  interval: String!
+}
+
+type KlineResponse {
+  data: [Kline!]!
+  count: Int!
+  symbol: String!
+  interval: String!
+  startTime: Float
+  endTime: Float
+}
+
+enum KlineInterval {
+  ONE_SECOND
+  ONE_MINUTE
+  THREE_MINUTES
+  FIVE_MINUTES
+  FIFTEEN_MINUTES
+  THIRTY_MINUTES
+  ONE_HOUR
+  TWO_HOURS
+  FOUR_HOURS
+  SIX_HOURS
+  EIGHT_HOURS
+  TWELVE_HOURS
+  ONE_DAY
+  THREE_DAYS
+  ONE_WEEK
+  ONE_MONTH
+}
+
+type Query {
+  getHistoricalKlines(
+    symbol: String!
+    interval: KlineInterval!
+    startTime: Float
+    endTime: Float
+    limit: Int
+  ): KlineResponse!
+  
+  getLatestKlines(
+    symbol: String!
+    interval: KlineInterval!
+    limit: Int
+  ): KlineResponse!
+}

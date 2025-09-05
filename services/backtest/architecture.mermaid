@@ -1,0 +1,137 @@
+---
+config:
+  theme: redux-dark
+---
+graph TD
+    Client([Client Application])
+    
+    subgraph "API Layer"
+        FastAPI[FastAPI Routes]
+        GraphQL[GraphQL Endpoint]
+        StrawberrySchema[Strawberry Schema]
+        
+        FastAPI --> StrawberrySchema
+        GraphQL --> StrawberrySchema
+    end
+    
+    Client <--> FastAPI
+    Client <--> GraphQL
+    
+    subgraph "GraphQL Resolvers"
+        Query[Query Resolvers]
+        Mutation[Mutation Resolvers]
+        
+        StrawberrySchema --> Query
+        StrawberrySchema --> Mutation
+    end
+    
+    subgraph "Service Factory"
+        BacktestFactory[BacktestServiceFactory]
+        
+        Mutation --> BacktestFactory
+    end
+    
+    subgraph "Backtest Services"
+        VectorizedService[VectorizedBacktestService]
+        EventService[EventDrivenBacktestService]
+        MLService[MLBacktestService]
+        
+        BacktestFactory --> VectorizedService
+        BacktestFactory --> EventService
+        BacktestFactory --> MLService
+    end
+    
+    subgraph "Strategy Implementations"
+        CrossoverMA[CrossoverMAStrategy]
+        SimpleStrategy[SimpleStrategy]
+        MLStrategy[MLTradingStrategy]
+        
+        VectorizedService --> CrossoverMA
+        VectorizedService --> SimpleStrategy
+        EventService --> CrossoverMA
+        EventService --> SimpleStrategy
+        MLService --> MLStrategy
+    end
+    
+    subgraph "Execution Engines"
+        VectorBT[VectorBT Portfolio]
+        Backtrader[Backtrader Cerebro]
+        MLModel[Scikit-Learn Models]
+        
+        VectorizedService --> VectorBT
+        EventService --> Backtrader
+        MLService --> VectorBT
+        MLStrategy --> MLModel
+    end
+    
+    subgraph "Data Fetching"
+        BinanceAPI[Binance OHLCV API]
+        CoinListAPI[Binance Exchange Info]
+        OHLCVFetcher[BinanceOHLCV]
+        CoinFetcher[CoinListFetcher]
+        
+        Query --> OHLCVFetcher
+        Query --> CoinFetcher
+        OHLCVFetcher --> BinanceAPI
+        CoinFetcher --> CoinListAPI
+        Mutation --> OHLCVFetcher
+    end
+    
+    subgraph "File Management"
+        ModelUploader[ModelUploader]
+        FileCacher[FileCacher Singleton]
+        SupabaseStorage[(Supabase Storage)]
+        LocalStorage[Local File System]
+        
+        FastAPI --> ModelUploader
+        ModelUploader --> SupabaseStorage
+        MLService --> FileCacher
+        FileCacher --> LocalStorage
+        MLStrategy --> LocalStorage
+    end
+    
+    subgraph "Database Layer"
+        BacktestDB[BacktestDatabase]
+        BacktestMapper[BacktestMapper]
+        MongoConnector[MongoDB Connector]
+        MongoDB[(MongoDB)]
+        
+        Mutation --> BacktestDB
+        Query --> BacktestDB
+        BacktestDB --> BacktestMapper
+        BacktestDB --> MongoConnector
+        MongoConnector --> MongoDB
+        FileCacher --> MongoDB
+    end
+    
+    subgraph "Data Models"
+        PydanticModels[Pydantic Models]
+        StrawberryTypes[Strawberry Types]
+        
+        BacktestMapper --> PydanticModels
+        StrawberrySchema --> StrawberryTypes
+    end
+    
+    subgraph "Result Processing"
+        VectorizedResult[VectorizedBacktestResult]
+        EventResult[EventDrivenBacktestResult]
+        
+        VectorizedService --> VectorizedResult
+        EventService --> EventResult
+        MLService --> VectorizedResult
+        VectorizedResult --> BacktestDB
+        EventResult --> BacktestDB
+    end
+    
+    %% External Dependencies
+    subgraph "External Libraries"
+        VBT[vectorbt]
+        BT[backtrader]
+        SKL[scikit-learn]
+        Pandas[pandas]
+        
+        VectorBT -.-> VBT
+        Backtrader -.-> BT
+        MLModel -.-> SKL
+        OHLCVFetcher -.-> Pandas
+    end
