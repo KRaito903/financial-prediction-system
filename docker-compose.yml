@@ -75,14 +75,26 @@ services:
           action: sync
           target: /usr/src/app
 
+  # NGINX Load Balancer
+  nginx-lb:
+    image: nginx:alpine
+    container_name: nginx-load-balancer
+    ports:
+      - "3000:3000"  # WebSocket (Load Balanced)
+      - "4002:4002"  # GraphQL (Load Balanced)
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - charting-service
+
   charting-service:
     build:
       context: ./services/charting-service
       dockerfile: Dockerfile
     container_name: charting-service
     ports:
-      - "3000:3000"  # Socket.io server
-      - "4002:4002"  # GraphQL server
+      - "3001:3000"  # Internal Socket.io (changed from 3000)
+      - "4003:4002"  # Internal GraphQL (changed from 4002)
     environment:
       - NODE_ENV=development
     develop:
@@ -98,7 +110,7 @@ services:
   apollo-service-router:
     depends_on:
       - users-service
-      - charting-service
+      - nginx-lb
       - sentiment-service
     image: ghcr.io/apollographql/router:v2.5.0
     container_name: apollo-service-router
@@ -135,21 +147,21 @@ services:
       - FLASK_HOST=sentiment-service
       - FLASK_PORT=4004
 
-  backtest-service:
-    build:
-      context: ./services/backtest
-      dockerfile: Dockerfile
-    container_name: backtest-service
-    ports:
-      - "5050:5050"
-    env_file:
-      - ./services/backtest/.env
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5050/health', timeout=10)"]
-      interval: 60s
-      timeout: 30s
-      retries: 3
-      start_period: 30s
+  # backtest-service:
+  #   build:
+  #     context: ./services/backtest
+  #     dockerfile: Dockerfile
+  #   container_name: backtest-service
+  #   ports:
+  #     - "5050:5050"
+  #   env_file:
+  #     - ./services/backtest/.env
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5050/health', timeout=10)"]
+  #     interval: 60s
+  #     timeout: 30s
+  #     retries: 3
+  #     start_period: 30s
 
   influxdb2:
     image: influxdb:2
