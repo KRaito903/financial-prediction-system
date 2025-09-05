@@ -48,6 +48,10 @@ class CryptoNews:
   def published_time(self):
     return self.__published_time
   
+  @published_time.setter
+  def published_time(self, value: float):
+    self.__published_time = value
+  
   @property
   def created_at(self):
     return self.__created_at
