@@ -41,6 +41,14 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     # path for timexer
     path = "models/timexer/day/"
     model_path = f"timexer_pred_{pred_len}.ckpt"
+
+    # Check path model timexer
+    list_model = [os.path.basename(f) for f in glob.glob("models/timexer/day/*")]
+    check = model_path in list_model
+    # Training model nếu không tìm thấy
+    if not check:
+        run_training_pipeline(datatype='1d', pre_len=pred_len, seq_len=60)
+
     with open(f"artifacts/normalizer_{pred_len}.pkl", "rb") as f:
         norm = pickle.load(f)
    
@@ -84,13 +92,7 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
         print(timegpt_pred)
         if model_name == "TimeGPT":
             return timegpt_pred
-    
-    # Check path
-    list_model = [os.path.basename(f) for f in glob.glob("models/timexer/day/*")]
-    check = model_path in list_model
-    # Training model nếu không tìm thấy
-    if not check:
-        run_training_pipeline(datatype='1d', pre_len=pred_len, seq_len=60)
+
 
     # load model timexer, chuẩn hoá dữ liệu
     timexer = ModelFactory.get_model("TimeXer", config=timexer_config)
@@ -115,4 +117,4 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     return timexer_pred
 
 if __name__ == "__main__":
-    prediction_pipeline(model_name="TimeGPT", symbol="BTCUSDT", pred_len=7, datatype="1d")
+    prediction_pipeline(model_name="Ensemble", symbol="BTCUSDT", pred_len=7, datatype="1d")

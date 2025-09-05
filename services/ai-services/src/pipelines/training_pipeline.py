@@ -25,7 +25,7 @@ ARTIFACTS_DIR = "artifacts" # Thư mục để lưu tất cả các kết quả
 
 
 def run_training_pipeline(datatype: str = '1d', pre_len: int = 7, seq_len: int = 60):
-    try:
+    try:  
         """
         Thực thi toàn bộ quy trình training model từ đầu đến cuối.
         

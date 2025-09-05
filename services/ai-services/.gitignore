@@ -4,5 +4,3 @@
 .venv312
 *.csv
 lightning_logs/
-*.pkl
-*.ckpt

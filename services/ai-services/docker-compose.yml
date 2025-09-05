@@ -1,0 +1,16 @@
+services:
+  ai-prediction-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4006:4006"
+    environment:
+      - DOCKER_ENV=1
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+      - CUDA_VISIBLE_DEVICES=""
+      - PYTORCH_DISABLE_MPS=1
+    volumes:
+      - ./models:/app/models:ro
+      - ./artifacts:/app/artifacts:ro
+    restart: unless-stopped
