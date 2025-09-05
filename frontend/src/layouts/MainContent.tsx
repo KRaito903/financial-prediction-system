@@ -4,7 +4,10 @@ import TimeRangeSelector from '../components/TimeRangeSelector';
 import ChartViewToggle from '../components/ChartViewToggle';
 import MultiChartView from '../components/MultiChartView';
 import TradeTable from '../components/TradeTable';
+import NewsTable from '../components/NewsTable';
 import { useMultiChart } from '../context/MultiChartContext';
+import { useQuery } from '@apollo/client';
+import { GET_NEWS } from '../lib/queries';
 import type { TimeRange } from '../types/chart';
 
 interface MainContentProps {
@@ -25,6 +28,11 @@ const MainContent: React.FC<MainContentProps> = () => {
   const hasError = viewMode === 'single' 
     ? selectedChart?.error 
     : charts.some(c => c.error);
+
+  const { data: newsData, loading: newsLoading } = useQuery(GET_NEWS, {
+    variables: { limit: 20 },
+    skip: viewMode !== 'single'
+  });
 
   return (
     <main className="flex-1 bg-gray-50 overflow-hidden">
@@ -84,15 +92,16 @@ const MainContent: React.FC<MainContentProps> = () => {
                 </div>
               </div>
               
-              {/* Chart and Trade Table Split View */}
-              <div className="flex flex-col h-96">
-                {/* Chart Section - Takes half the height */}
-                <div className="flex-1 mb-4">
+              {/* Chart, Trade Table, and News Table Layout */}
+              <div className="flex flex-col" style={{ height: 'calc(100% - 32px)' }}>
+                {/* Chart Section - Takes 40% of height */}
+                <div className="mb-4" style={{ height: '40%' }}>
                   {selectedChart?.candlestickData.length ? (
-                    <ChartComponent 
-                      data={selectedChart.candlestickData}
-                      height={192} // Half of original 384px
-                    />
+                    <div className="h-full">
+                      <ChartComponent 
+                        data={selectedChart.candlestickData}
+                      />
+                    </div>
                   ) : (
                     <div className="flex items-center justify-center h-full bg-gray-50 rounded">
                       <div className="text-center">
@@ -113,12 +122,25 @@ const MainContent: React.FC<MainContentProps> = () => {
                   )}
                 </div>
                 
-                {/* Trade Table Section - Takes half the height */}
-                <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
-                  <TradeTable 
-                    trades={selectedChart?.tradeData || []} 
-                    loading={selectedChart?.loading || false}
-                  />
+                {/* Split view for Trade Table and News Table */}
+                <div className="flex-1 flex gap-4 min-h-0">
+                  {/* Trade Table Section - Takes left half */}
+                  <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+                    <TradeTable 
+                      trades={selectedChart?.tradeData || []} 
+                      loading={selectedChart?.loading || false}
+                    />
+                  </div>
+                  
+                  {/* News Table Section - Takes right half */}
+                  <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="p-4 h-full">
+                      <NewsTable 
+                        news={newsData?.news || []} 
+                        loading={newsLoading}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

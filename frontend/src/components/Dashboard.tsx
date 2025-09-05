@@ -49,7 +49,7 @@ export const ChartComponent = (props: {
           textColor,
       },
       width: chartContainerRef.current.clientWidth,
-      height,
+      height: height || chartContainerRef.current.clientHeight,
       timeScale: {
         timeVisible: true,
         secondsVisible: true,

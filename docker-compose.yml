@@ -135,6 +135,7 @@ services:
     depends_on:
       - sentiment-service-database
       - kafka-init
+      - kafka
     build:
       context: ./services/sentiment-news-prediction-service
       dockerfile: Dockerfile
