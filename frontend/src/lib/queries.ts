@@ -206,3 +206,16 @@ export const GET_HISTORICAL_KLINES = gql`
     }
   }
 `;
+
+export const GET_NEWS = gql`
+  query GetNews($limit: Int!) {
+    news(limit: $limit) {
+      id
+      title
+      text
+      url
+      publishedTime
+      sentimentScore
+    }
+  }
+`;
