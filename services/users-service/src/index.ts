@@ -1,7 +1,7 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 
-import { UsersAPI } from "./datasources/users-api";
+import { UsersPrismaAPI } from "./datasources/users-prisma";
 import { resolvers } from "./resolvers";
 import { readFileSync } from "fs";
 
@@ -26,7 +26,7 @@ async function startApolloServer() {
     context: async () => {
       return {
         dataSources: {
-          usersAPI: new UsersAPI(),
+          usersAPI: new UsersPrismaAPI(),
         },
       };
     },

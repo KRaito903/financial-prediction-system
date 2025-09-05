@@ -2,16 +2,16 @@ import { Resolvers } from "./types";
 
 export const resolvers: Resolvers = {
   Query: {
-    listUsers: (_, __, { dataSources }) => {
-      return dataSources.usersAPI.listUsers();
+    listUsers: async (_, __, { dataSources }) => {
+      return await dataSources.usersAPI.listUsers();
     },
-    login: (_, { username, password }, { dataSources }) => {
-      return dataSources.usersAPI.login(username, password);
+    login: async (_, { email, password }, { dataSources }) => {
+      return await dataSources.usersAPI.login(email, password);
     },
   },
   Mutation: {
-    signup: (_, { username, password, name, email }, { dataSources }) => {
-      return dataSources.usersAPI.signup(username, password, name, email);
+    signup: async (_, { email, password }, { dataSources }) => {
+      return await dataSources.usersAPI.signup(email, password);
     },
   },
 };

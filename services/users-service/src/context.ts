@@ -1,7 +1,7 @@
-import { UsersAPI } from "./datasources/users-api";
+import { UsersPrismaAPI } from "./datasources/users-prisma";
 
 export type DataSourceContext = {
   dataSources: {
-    usersAPI: UsersAPI;
+    usersAPI: UsersPrismaAPI;
   };
 };
