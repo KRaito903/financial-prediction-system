@@ -215,3 +215,42 @@ export const GET_NEWS = gql`
     }
   }
 `;
+
+export const CHANGE_PASSWORD_MUTATION = gql`
+  mutation ChangePassword($input: ChangePasswordInput!) {
+    changePassword(input: $input) {
+      success
+      message
+      user {
+        id
+        email
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const CHANGE_EMAIL_MUTATION = gql`
+  mutation ChangeEmail($input: ChangeEmailInput!) {
+    changeEmail(input: $input) {
+      success
+      message
+      user {
+        id
+        email
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const DELETE_ACCOUNT_MUTATION = gql`
+  mutation DeleteAccount {
+    deleteAccount {
+      success
+      message
+    }
+  }
+`;

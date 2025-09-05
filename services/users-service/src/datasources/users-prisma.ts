@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { User, AuthPayload } from '../types';
+import { User, AuthPayload, SettingsPayload } from '../types';
 
 export class UsersPrismaAPI {
   private prisma: PrismaClient;
@@ -107,6 +107,89 @@ export class UsersPrismaAPI {
       return {
         success: false,
         message: "Signup failed"
+      };
+    }
+  }
+
+  async changePassword(userId: string, newPassword: string): Promise<SettingsPayload> {
+    try {
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: parseInt(userId) },
+        data: { password: hashedPassword },
+      });
+
+      return {
+        success: true,
+        message: "Password updated successfully",
+        user: {
+          id: updatedUser.id.toString(),
+          email: updatedUser.email,
+          password: updatedUser.password,
+          createdAt: updatedUser.createdAt.toISOString(),
+          updatedAt: updatedUser.updatedAt.toISOString(),
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Failed to update password"
+      };
+    }
+  }
+
+  async changeEmail(userId: string, newEmail: string): Promise<SettingsPayload> {
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: newEmail },
+      });
+
+      if (existingUser && existingUser.id.toString() !== userId) {
+        return {
+          success: false,
+          message: "Email already exists"
+        };
+      }
+
+      const updatedUser = await this.prisma.user.update({
+        where: { id: parseInt(userId) },
+        data: { email: newEmail },
+      });
+
+      return {
+        success: true,
+        message: "Email updated successfully",
+        user: {
+          id: updatedUser.id.toString(),
+          email: updatedUser.email,
+          password: updatedUser.password,
+          createdAt: updatedUser.createdAt.toISOString(),
+          updatedAt: updatedUser.updatedAt.toISOString(),
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Failed to update email"
+      };
+    }
+  }
+
+  async deleteAccount(userId: string): Promise<SettingsPayload> {
+    try {
+      await this.prisma.user.delete({
+        where: { id: parseInt(userId) },
+      });
+
+      return {
+        success: true,
+        message: "Account deleted successfully"
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Failed to delete account"
       };
     }
   }

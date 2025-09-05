@@ -20,6 +20,29 @@ type Query {
   login(email: String!, password: String!): AuthPayload!
 }
 
+input ChangePasswordInput {
+  userId: ID!
+  newPassword: String!
+}
+
+input ChangeEmailInput {
+  userId: ID!
+  newEmail: String!
+}
+
+input deleteAccoutInput {
+  userId: ID!
+}
+
+type SettingsPayload {
+  success: Boolean!
+  message: String!
+  user: User
+}
+
 type Mutation {
   signup(email: String!, password: String!): AuthPayload!
+  changePassword(input: ChangePasswordInput!): SettingsPayload!
+  changeEmail(input: ChangeEmailInput!): SettingsPayload!
+  deleteAccount(input: deleteAccoutInput!): SettingsPayload!
 }
