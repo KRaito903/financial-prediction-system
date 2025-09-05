@@ -1,0 +1,6 @@
+federation_version: 2
+subgraphs:
+  ai_prediction:
+    routing_url: http://localhost:4006
+    schema:
+      subgraph_url: http://localhost:4006

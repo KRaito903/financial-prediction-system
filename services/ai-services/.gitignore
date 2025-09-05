@@ -1,5 +1,6 @@
 .env
 .venv
+.venv10
 .venv312
 *.csv
 lightning_logs/

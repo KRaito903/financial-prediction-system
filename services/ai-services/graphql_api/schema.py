@@ -7,10 +7,12 @@ from graphql_api.types import PredictionRow, TrainResult
 @strawberry.type
 class Mutation:
     train_model: TrainResult = strawberry.mutation(resolver=resolve_train_model)
-    predict_model: typing.List[PredictionRow] = strawberry.mutation(resolver=resolve_predict_model)
 
 @strawberry.type
 class Query:
     health_check: str = strawberry.field(resolver=lambda: "OK")
+    predict_model: typing.List[PredictionRow] = strawberry.field(resolver=resolve_predict_model)
 
-schema = strawberry.Schema(query=Query, mutation=Mutation)
+schema = strawberry.federation.Schema(
+    query=Query, mutation=Mutation, types=[PredictionRow, TrainResult], enable_federation_2=True
+)

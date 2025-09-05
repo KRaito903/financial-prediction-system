@@ -2,12 +2,12 @@
 import strawberry
 
 
-@strawberry.type
+@strawberry.federation.type
 class TrainResult:
     model_name: str
     status: str
 
-@strawberry.type
+@strawberry.federation.type
 class PredictionRow:
     timestamp: str
     close: float
