@@ -21,15 +21,15 @@ dotenv.load_dotenv()
 CONFIG_PATH = "configs/main_config.yaml"
 
 
-def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", pred_length: int = 7, datatype: str = "1d"):
-
+def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", pred_len: int = 7, datatype: str = "1d"):
+    print(f"Starting prediction pipeline with model: {model_name}, symbol: {symbol}, pred_len: {pred_len}, datatype: {datatype}")
     with open(CONFIG_PATH, 'r') as f:
         read_config = yaml.safe_load(f)
 
 
     # Xác định khoảng fetch data
-    date_fetch = "2023-01-01" if (pred_length <= 7) else "2021-01-01"
-    hour_fetch = "2025-01-01" if (pred_length <= 7) else "2024-01-01"
+    date_fetch = "2023-01-01" if (pred_len <= 7) else "2021-01-01"
+    hour_fetch = "2025-01-01" if (pred_len <= 7) else "2024-01-01"
 
     # Tạo fetcher và engineer + loader
     fetcher = FetcherFactory.create_data_fetcher("binance", api_key=os.getenv("API-Key"), api_secret=os.getenv("Secret-Key"))
@@ -40,15 +40,15 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
    
     # path for timexer
     path = "models/timexer/day/"
-    model_path = f"timexer_pred_{pred_length}.ckpt"
-    with open(f"artifacts/normalizer_{pred_length}.pkl", "rb") as f:
+    model_path = f"timexer_pred_{pred_len}.ckpt"
+    with open(f"artifacts/normalizer_{pred_len}.pkl", "rb") as f:
         norm = pickle.load(f)
    
     # config model and data
     #timeGPT
     timegpt_config = TimeGPTConfig(
         api_key=api,
-        pred=pred_length
+        pred=pred_len
     )
 
     timegpt_data_config = TimeGPTDataConfig(
@@ -62,7 +62,7 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     #timexer
     timexer_config = TimeXerConfig(
         data=None,
-        pred=pred_length,
+        pred=pred_len,
         seq=60,
         path=path,
         model_path=path + model_path
@@ -90,7 +90,7 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     check = model_path in list_model
     # Training model nếu không tìm thấy
     if not check:
-        run_training_pipeline(datatype='1d', pre_len=pred_length, seq_len=60)
+        run_training_pipeline(datatype='1d', pre_len=pred_len, seq_len=60)
 
     # load model timexer, chuẩn hoá dữ liệu
     timexer = ModelFactory.get_model("TimeXer", config=timexer_config)
@@ -101,7 +101,7 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     
     # Sử dụng phương pháp đơn giản nhưng hiệu quả là trung bình nhân (do chưa train được weighted_avg) => có thể mơ rộng trong tương lai
 
-    ensemble = ForecastEnsemble(method="weighted_avg", weights=[0.66, 0.34])
+    ensemble = ForecastEnsemble(method="weighted_avg", weights=[0.70, 0.30])
 
     arr1 = np.array(timegpt_pred['close'])
     arr2 = np.array(timexer_pred['close'])
@@ -115,4 +115,4 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     return timexer_pred
 
 if __name__ == "__main__":
-    prediction_pipeline(model_name="Ensemble", symbol="BTCUSDT", pred_length=7, datatype="1d")
+    prediction_pipeline(model_name="TimeGPT", symbol="BTCUSDT", pred_len=7, datatype="1d")

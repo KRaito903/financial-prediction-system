@@ -1,5 +1,6 @@
 .env
-.venv 
+.venv
+.venv312
 *.csv
 lightning_logs/
 *.pkl
