@@ -8,7 +8,7 @@ CREATE DATABASE news_sentiment
   CONNECTION LIMIT = -1;
 
 -- connect to the database
-\c news_sentiment;
+\c news_sentiment
 
 -- create news table
 CREATE TABLE IF NOT EXISTS news (
