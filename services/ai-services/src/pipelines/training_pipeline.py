@@ -90,4 +90,4 @@ def run_training_pipeline(datatype: str = '1d', pre_len: int = 7, seq_len: int =
 
 if __name__ == '__main__':
     # Chạy pipeline trực tiếp từ command line để test
-    run_training_pipeline(datatype='1d', pre_len=29, seq_len=60)
+    run_training_pipeline(datatype='1d', pre_len=8, seq_len=60)

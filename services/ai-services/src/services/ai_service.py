@@ -57,7 +57,6 @@ class AIService:
         try:
             # Import and use existing prediction pipeline
             from src.pipelines.prediction_pipeline import prediction_pipeline
-            logger.info("ok111")
             return prediction_pipeline(
                 model_name=model_name,
                 symbol=symbol,
