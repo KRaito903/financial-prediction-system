@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pickle
 import dotenv
@@ -12,17 +13,16 @@ from src.models_lib.model_config.timexer_config import TimeXerConfig, TimexerDat
 from src.models_lib.model_config.timegpt_config import TimeGPTDataConfig, TimeGPTConfig
 from src.utils.ensemble import ForecastEnsemble
 
+logger = logging.getLogger(__name__)
+
 dotenv.load_dotenv()
 
 # Config
 CONFIG_PATH = "configs/main_config.yaml"
 
-def run_model_prediction(model, data):
-    pass
-
 
 def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", pred_length: int = 7, datatype: str = "1d"):
-    
+
     with open(CONFIG_PATH, 'r') as f:
         read_config = yaml.safe_load(f)
 

@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import ta
-from sklearn.preprocessing import StandardScaler
 from typing import Optional
 
 class FeatureEngineer:
