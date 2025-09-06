@@ -88,14 +88,23 @@ def run_training_pipeline(datatype: str = '1d', pre_len: int = 7, seq_len: int =
         model = ModelFactory.get_model("TimeXer", config=timxer_config)
         print(model)
         model.train()
+
+        #Upload model lên S3
+        s3_saver = SaverFactory.create_data_saver(
+            "s3", aws_access_key_id=os.getenv("Aws_access_key_id"), 
+            aws_secret_access_key=os.getenv("Aws_secret_access_key"), 
+            bucket_name="crypto-ai-prediction")
+        s3_saver.save_data(file_path=f"models/timexer/day/timexer_pred_{pre_len}.ckpt")
+
         # tra kết quả về cho model
         return {
             "model_name": f"timexer_pred_{pre_len}",
             "status": "success"
         }
     except Exception as e:
+        print(f"Error: {e}")
         return {
-            "model_name": None,
+            "model_name": "Error",
             "status": {"error": str(e)}
         }
 

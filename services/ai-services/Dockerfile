@@ -2,29 +2,22 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Force sử dụng CPU và disable MPS
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTORCH_ENABLE_MPS_FALLBACK=1
 ENV CUDA_VISIBLE_DEVICES=""
 ENV DOCKER_ENV=1
 ENV PYTORCH_DISABLE_MPS=1
-ENV MPS_DISABLE=1
 
-# Copy requirements
 COPY requirements.txt .
-
-# Install PyTorch CPU-only version
-RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
-
-# Install dependencies
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# Copy toàn bộ source code (bao gồm models/, artifacts/)
 COPY . .
 
-# Create directories
-RUN mkdir -p models artifacts lightning_logs data
+# Chỉ cần set permissions cho writable directories
+RUN chmod -R 755 models artifacts data
 
 EXPOSE 4006
 

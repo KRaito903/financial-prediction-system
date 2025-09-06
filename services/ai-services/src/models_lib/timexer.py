@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import torch
-
-from src.utils.devices import get_device
+import yaml
 from .base_model import BaseModel
 from pytorch_forecasting import TimeSeriesDataSet
 import lightning as L
@@ -16,6 +15,11 @@ from pytorch_forecasting.metrics import QuantileLoss
 from pytorch_forecasting.models.timexer import TimeXer
 from src.models_lib.model_config.timexer_config import TimeXerConfig
 from src.models_lib.model_config.timexer_config import TimexerDataConfig
+import yaml
+
+CONFIG_PATH = "configs/main_config.yaml"
+with open(CONFIG_PATH, 'r') as f:
+    read_config = yaml.safe_load(f)
 
 class TimeXerModel(BaseModel):
 
@@ -110,7 +114,7 @@ class TimeXerModel(BaseModel):
         )
 
         self.trainer = pl.Trainer(
-            max_epochs=100,
+            max_epochs=5,
             accelerator="cpu",
             devices=1,
             gradient_clip_val=0.1,
@@ -150,65 +154,13 @@ class TimeXerModel(BaseModel):
         )
         print("Training complete.")
 
-    # def predict(self, data_to_predict: pd.DataFrame, **kwargs):
-    
-
-    #     device = torch.device('cpu')  # Force CPU
-    #     print("Using device:", device)
-
-    #     """
-    #     Dự đoán trên dữ liệu mới (phải là DataFrame).
-    #     """
-    #     # Thêm các dòng mới với timestamp = ngày cuối + 1, +2, ..., +seq
-    #     data_to_predict = data_to_predict.copy().reset_index(drop=False)
-    #     last_day = data_to_predict["timestamp"].max()
-    #     new_rows = []
-    #     for i in range(1, self.pred + 1):
-    #         new_row = data_to_predict.iloc[-1].copy()
-    #         new_row["timestamp"] = last_day + pd.Timedelta(days=i)
-    #         new_rows.append(new_row)
-    #     data_to_predict = pd.concat([data_to_predict, pd.DataFrame(new_rows)], ignore_index=True)
-    #     # timexer_loaded = TimeXer.load_from_checkpoint(self.model_path)
-    #     # Force CPU khi load model
-    #     timexer_loaded = TimeXer.load_from_checkpoint(
-    #         self.model_path, 
-    #         map_location=device  # Force load to CPU
-    #     )
-
-    #     timexer_loaded.to(device) 
-    #     training_loaded = torch.load(self.path + f"timexer_dataset_{self.pred}.pkl", weights_only=False, map_location=device)
-
-    #     min_timestamp_original = data_to_predict["timestamp"].min()
-    #     data_to_predict["time_idx"] = (data_to_predict["timestamp"] - min_timestamp_original).dt.days
-
-    #     new_prediction_dataset = TimeSeriesDataSet.from_dataset(
-    #         training_loaded, data_to_predict, predict=True, stop_randomization=True
-    #     )
-
-    #     new_dataloader = new_prediction_dataset.to_dataloader(
-    #         train=False, batch_size=128, num_workers=0
-    #     )
-
-    #     predictions = timexer_loaded.predict(new_dataloader)
-    #     pred_values = predictions[0].detach().cpu().numpy()
-
-    #     # Lấy các timestamp mới đã thêm vào
-    #     future_timestamps = data_to_predict["timestamp"].iloc[-self.pred:].reset_index(drop=True)
-
-    #     # Trả về DataFrame với các cột: timestamp, close
-    #     result_df = pd.DataFrame({
-    #         "timestamp": future_timestamps,
-    #         "close": pred_values
-    #     })
-    #     return result_df
-
     def predict(self, data_to_predict: pd.DataFrame, **kwargs):
         # Force CPU device
         device = torch.device('cpu')
         print("Using device:", device)
         
         # Ensure PyTorch chỉ sử dụng CPU
-        torch.backends.mps.is_available = lambda: False
+        # torch.backends.mps.is_available = lambda: False
         
         data_to_predict = data_to_predict.copy().reset_index(drop=False)
         last_day = data_to_predict["timestamp"].max()
@@ -220,8 +172,9 @@ class TimeXerModel(BaseModel):
         data_to_predict = pd.concat([data_to_predict, pd.DataFrame(new_rows)], ignore_index=True)
         
         # Load model với map_location=cpu
+        # Load model từ s3
         timexer_loaded = TimeXer.load_from_checkpoint(
-            self.model_path, 
+            checkpoint_path=read_config['cloudfront_url'] + self.model_path,
             map_location=device
         )
         timexer_loaded.to(device)

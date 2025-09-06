@@ -11,3 +11,4 @@ coins: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT']
 
 numeric_cols: ["open", "high", "low", "close", "volume", "close_lag_1", "close_lag_7", "ema_10", "ema_20"]
 
+cloudfront_url: "https://d613yp7wr7vrh.cloudfront.net/"
