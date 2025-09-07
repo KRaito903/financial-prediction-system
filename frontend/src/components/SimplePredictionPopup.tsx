@@ -39,7 +39,9 @@ const SimplePredictionPopup: React.FC<SimplePredictionPopupProps> = ({
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0 || !popupRef.current) return;
+    
     e.preventDefault();
+    
     setIsDragging(true);
     setOffset({
         x: e.clientX - position.x,
