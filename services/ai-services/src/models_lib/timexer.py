@@ -102,7 +102,7 @@ class TimeXerModel(BaseModel):
 
         # 4. Trainer với EarlyStopping + Save Model
         early_stop_callback = EarlyStopping(
-            monitor="val_loss", min_delta=1e-4, patience=10, verbose=False, mode="min"
+            monitor="val_loss", min_delta=1e-4, patience=12, verbose=False, mode="min"
         )
 
         checkpoint_callback = ModelCheckpoint(
@@ -114,7 +114,7 @@ class TimeXerModel(BaseModel):
         )
 
         self.trainer = pl.Trainer(
-            max_epochs=5,
+            max_epochs=100,
             accelerator="cpu",
             devices=1,
             gradient_clip_val=0.1,
@@ -130,9 +130,9 @@ class TimeXerModel(BaseModel):
             hidden_size=256,
             n_heads=4,
             e_layers=3,
-            d_ff=512,
+            d_ff=256,
             dropout=0.1,
-            learning_rate=0.01,
+            learning_rate=0.03,
             output_size=7,   # quantile loss => cần output_size=7
             loss=QuantileLoss(),
             log_interval=2,

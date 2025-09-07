@@ -44,14 +44,14 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
 
     # Check path model timexer
     list_model = [os.path.basename(f) for f in glob.glob("models/timexer/day/*")]
-    check = model_path in list_model
+    check = f"timexer_dataset_{pred_len}.pkl" in list_model
     # Training model nếu không tìm thấy
     if not check:
-        run_training_pipeline(datatype='1d', pre_len=pred_len, seq_len=60)
+        temp = run_training_pipeline(datatype='1d', pre_len=pred_len, seq_len=60)
 
     with open(f"artifacts/normalizer_{pred_len}.pkl", "rb") as f:
         norm = pickle.load(f)
-   
+
     # config model and data
     #timeGPT
     timegpt_config = TimeGPTConfig(
