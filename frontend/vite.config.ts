@@ -10,6 +10,7 @@ export default defineConfig({
     proxy: {
       '/graphql': {
         target: 'http://apollo-service-router:4000',
+        // target: 'http://ai-prediction-service:4006',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/graphql/, "")

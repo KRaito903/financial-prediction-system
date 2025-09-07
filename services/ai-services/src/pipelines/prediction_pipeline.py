@@ -46,11 +46,29 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
     list_model = [os.path.basename(f) for f in glob.glob("models/timexer/day/*")]
     check = f"timexer_dataset_{pred_len}.pkl" in list_model
     # Training model nếu không tìm thấy
-    if not check:
+    if (not check) and (model_name in ["TimeXer", "Ensemble"]):
         temp = run_training_pipeline(datatype='1d', pre_len=pred_len, seq_len=60)
+    
+    if (model_name in ["TimeXer", "Ensemble"]):
+        with open(f"artifacts/normalizer_{pred_len}.pkl", "rb") as f:
+            norm = pickle.load(f)
 
-    with open(f"artifacts/normalizer_{pred_len}.pkl", "rb") as f:
-        norm = pickle.load(f)
+            #timexer
+        timexer_config = TimeXerConfig(
+            data=None,
+            pred=pred_len,
+            seq=60,
+            path=path,
+            model_path=path + model_path
+        )
+
+        timexer_data_config = TimexerDataConfig(
+            symbol=symbol,
+            interval="1d",
+            fetcher=fetcher,
+            engineer=engineer,
+            norm=norm
+        )
 
     # config model and data
     #timeGPT
@@ -67,23 +85,7 @@ def prediction_pipeline(model_name: str = "Ensemble", symbol: str = "BTCUSDT", p
         start_str=hour_fetch if datatype == "1h" else date_fetch
     )
 
-    #timexer
-    timexer_config = TimeXerConfig(
-        data=None,
-        pred=pred_len,
-        seq=60,
-        path=path,
-        model_path=path + model_path
-    )
-
-    timexer_data_config = TimexerDataConfig(
-        symbol=symbol,
-        interval="1d",
-        fetcher=fetcher,
-        engineer=engineer,
-        norm=norm
-    )
-
+    
     # Nếu api chọn model TimeGPT
     if (model_name == "TimeGPT" or model_name == "Ensemble"):
         print('Using TimeGPT model')

@@ -219,3 +219,33 @@ export const GET_NEWS = gql`
     }
   }
 `;
+
+export const PREDICT_MODEL = gql`
+  query PredictModel($datatype: String!, $modelName: String!, $predLen: Int!, $symbol: String!) {
+    predictModel(
+      datatype: $datatype
+      modelName: $modelName
+      predLen: $predLen
+      symbol: $symbol
+    ) {
+      close
+      symbol
+      timestamp
+    }
+  }
+`;
+
+export const TRAIN_MODEL = gql`
+  mutation TrainModel($datatype: String!, $predLen: Int!) {
+    trainModel(datatype: $datatype, predLen: $predLen) {
+      modelName
+      status
+    }
+  }
+`;
+
+export const CHECK_MODEL_STATUS = gql`
+  query CheckModel($modelName: String!, $predLen: Int!) {
+    checkModel(modelName: $modelName, predLen: $predLen)
+  }
+`;

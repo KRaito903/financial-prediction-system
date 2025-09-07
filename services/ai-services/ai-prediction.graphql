@@ -59,6 +59,7 @@ type Query
 {
   healthCheck: String!
   predictModel(modelName: String!, predLen: Int!, symbol: String!, datatype: String!): [PredictionRow!]!
+  checkModel(modelName: String!, predLen: Int!): Boolean!
 }
 
 type TrainResult
