@@ -27,11 +27,7 @@ function App() {
   						<Route path="/signup" element={<Signup />} />
   						<Route
   							path="/dashboard"
-  							element={
-								  // <ProtectedRoute>
-  									<Dashboard />
-								  // {/* </ProtectedRoute> */}
-  							}
+  							element={<Dashboard />}
   						/>
   						<Route
 							path="/backtest"
@@ -51,7 +47,7 @@ function App() {
 						/>
 						<Route
 							path="/"
-							element={<Navigate to="/login" replace />}
+							element={<Navigate to="/dashboard" replace />}
 						/>
   					</Routes>
 					<Toaster />

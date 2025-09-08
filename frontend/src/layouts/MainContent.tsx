@@ -1,10 +1,10 @@
 import React from 'react';
 import { ChartComponent } from '../components/Dashboard';
 import TimeRangeSelector from '../components/TimeRangeSelector';
-import ChartViewToggle from '../components/ChartViewToggle';
 import MultiChartView from '../components/MultiChartView';
 import TradeTable from '../components/TradeTable';
 import NewsTable from '../components/NewsTable';
+import TopNavigation from '../components/TopNavigation';
 import { useMultiChart } from '../context/MultiChartContext';
 import { useQuery } from '@apollo/client';
 import { GET_NEWS } from '../lib/queries';
@@ -37,24 +37,10 @@ const MainContent: React.FC<MainContentProps> = () => {
   return (
     <main className="flex-1 bg-gray-50 overflow-hidden">
       {/* Top Navigation */}
-      <nav className="bg-white shadow">
-        <div className="px-6 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Trading Dashboard
-            </h1>
-            <div className="flex items-center gap-4">
-              <ChartViewToggle 
-                currentView={viewMode}
-                onViewChange={setViewMode}
-              />
-              {/* <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                Logout
-              </button> */}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <TopNavigation 
+        currentView={viewMode}
+        onViewChange={setViewMode}
+      />
 
       {/* Chart Area */}
       <div className="p-6" style={{ height: 'calc(100vh - 88px)' }}>

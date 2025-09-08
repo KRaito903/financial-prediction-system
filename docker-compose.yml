@@ -56,6 +56,23 @@ services:
           ignore:
             - node_modules/
 
+  users-db:
+    image: postgres:15-alpine
+    container_name: users-db
+    environment:
+      - POSTGRES_DB=users_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - users_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 60s
+      timeout: 5s
+      retries: 5
+
   users-service:
     build:
       context: ./services/users-service
@@ -66,6 +83,10 @@ services:
       - "4001:4001"
     environment:
       - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres123@users-db:5432/users_db
+    depends_on:
+      users-db:
+        condition: service_healthy
     develop:
       watch:
         - path: ./services/users-service/package.json
@@ -111,7 +132,7 @@ services:
     depends_on:
       - users-service
       - nginx-lb
-      - sentiment-service
+      # - sentiment-service
     image: ghcr.io/apollographql/router:v2.5.0
     container_name: apollo-service-router
     ports:
@@ -186,3 +207,6 @@ secrets:
     file: ./.env.influxdb2-admin-password
   influxdb2-admin-token:
     file: ./.env.influxdb2-admin-token
+
+volumes:
+  users_db_data:
