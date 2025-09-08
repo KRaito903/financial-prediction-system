@@ -252,7 +252,9 @@ export const DELETE_ACCOUNT_MUTATION = gql`
       success
       message
     }
-    
+  }
+`;
+
 export const PREDICT_MODEL = gql`
   query PredictModel($datatype: String!, $modelName: String!, $predLen: Int!, $symbol: String!) {
     predictModel(

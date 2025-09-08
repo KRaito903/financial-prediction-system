@@ -175,7 +175,7 @@ services:
     build:
       context: ./services/backtest
       dockerfile: Dockerfile
-    container_name: backtest
+    container_name: backtest # to create DNS http://backtest:5050/, DO NOT CHANGE
     ports:
       - "5050:5050"
     env_file:
