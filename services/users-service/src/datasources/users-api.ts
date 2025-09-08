@@ -71,4 +71,8 @@ export class UsersAPI {
       user: newUser
     };
   }
+
+  listUsersByName(name: string) {
+    return users.filter(user => user.name.toLowerCase().includes(name.toLowerCase()));
+  }
 }

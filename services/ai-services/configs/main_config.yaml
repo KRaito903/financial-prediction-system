@@ -1,0 +1,14 @@
+# configs/main_config.yaml
+fe:
+  lags: [1, 7]
+  emas: [10, 20]
+  add_volatility: true
+  add_rsi: true
+  add_datetime: true
+
+coins: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT']
+
+
+numeric_cols: ["open", "high", "low", "close", "volume", "close_lag_1", "close_lag_7", "ema_10", "ema_20"]
+
+cloudfront_url: "https://d613yp7wr7vrh.cloudfront.net/"

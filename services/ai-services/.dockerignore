@@ -1,0 +1,35 @@
+__pycache__/
+.venv/
+*.csv
+lightning_logs/
+
+# Docker files
+docker-compose.yml
+Dockerfile
+
+router/
+
+notebooks/
+*.ipynb
+
+# Git
+.git/
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+
+
+# File not access
+Readme.md
+

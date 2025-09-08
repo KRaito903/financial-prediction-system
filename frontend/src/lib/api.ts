@@ -166,3 +166,59 @@ export async function fetchTradingPairs(): Promise<TradingPair[]> {
     ];
   }
 }
+
+
+const CLOUDFRONT_BASE_CONFIG_URL = 'https://d613yp7wr7vrh.cloudfront.net/config/modelConfig.json';
+/**
+ * Lấy file cấu hình GỐC từ CloudFront.
+ * File này chứa các thiết lập mặc định cho tất cả model.
+ */
+export const fetchBaseModelConfig = async (): Promise<Record<string, any>> => {
+  try {
+    const response = await fetch(`${CLOUDFRONT_BASE_CONFIG_URL}?v=${new Date().getTime()}`);
+    if (!response.ok) {
+      throw new Error("Không thể tải cấu hình gốc từ CloudFront");
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Lỗi khi tải cấu hình gốc:", error);
+    // Trả về object rỗng nếu có lỗi nghiêm trọng
+    return {};
+  }
+};
+/**
+ * Lấy file cấu hình TÙY CHỈNH từ backend (backend đọc từ S3).
+ * File này chỉ chứa các predLen do người dùng thêm vào.
+ */
+export const fetchCustomPredLens = async (): Promise<Record<string, number[]>> => {
+  try {
+    const response = await fetch("/api/config/custom-predlens");
+    if (!response.ok) {
+        if(response.status === 404) return {}; // Nếu file chưa có, trả về rỗng
+        throw new Error("Không thể tải cấu hình tùy chỉnh");
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Lỗi khi tải cấu hình tùy chỉnh:", error);
+    return {};
+  }
+};
+
+/**
+ * Gửi cấu hình TÙY CHỈNH mới lên backend để lưu vào S3.
+ */
+export const updateCustomPredLens = async (newConfig: Record<string, number[]>): Promise<boolean> => {
+  try {
+    const response = await fetch("/api/config/custom-predlens", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newConfig),
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Lỗi khi cập nhật cấu hình tùy chỉnh:", error);
+    return false;
+  }
+};

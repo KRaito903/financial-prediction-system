@@ -1,5 +1,28 @@
+# Dependencies
 node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build output
 dist/
+
+# Environment variables
+.env
+services/router/.env
+
+# OS files
+.DS_Store
+
+# Apollo Router
+supergraph.graphql
+router/
+
+#AI-predictions
+__pycache__/
+timexer_env/
+checkpoints/
+test_results/
+results/
 .env*
 .DS_Store
 npm-debug.log

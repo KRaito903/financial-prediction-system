@@ -1,8 +1,22 @@
-import React, {useRef} from 'react';
-import { CandlestickSeries, createChart, ColorType } from 'lightweight-charts';
-import { type DeepPartial } from 'lightweight-charts';
+import React, { useRef, useState, useEffect } from 'react';
+import { createChart, ColorType, type DeepPartial, CandlestickSeries } from 'lightweight-charts';
 import Sidebar from '../layouts/Sidebar';
 import MainContent from '../layouts/MainContent';
+
+// --- PHẦN BỔ SUNG CHO TÍNH NĂNG AI ---
+import AIColumn from '../layouts/AIColumn';
+import SimplePredictionPopup from './SimplePredictionPopup';
+import { Button } from '@/components/ui/button';
+import { BrainCircuit } from 'lucide-react';
+
+// Định nghĩa kiểu dữ liệu cho kết quả dự đoán
+interface PredictionResult {
+  close: number;
+  symbol: string;
+  timestamp: string;
+}
+
+
 interface CandlestickData {
   time: number;
   open: number;
@@ -12,6 +26,7 @@ interface CandlestickData {
   symbol?: string;
   interval?: string;
 }
+
 export const ChartComponent = (props: {
   data: CandlestickData[], 
   colors?: {
@@ -66,6 +81,7 @@ export const ChartComponent = (props: {
     }
     
     chart.timeScale().fitContent();
+    // @ts-ignore - Bỏ qua lỗi TypeScript có thể xảy ra do định nghĩa kiểu không chuẩn
     const newSeries = chart.addSeries(CandlestickSeries, { 
       upColor, 
       downColor, 
@@ -94,10 +110,61 @@ export const ChartComponent = (props: {
 }
 
 const Dashboard: React.FC = () => {
+  // --- PHẦN BỔ SUNG CHO TÍNH NĂNG AI ---
+  const [savedPredictions, setSavedPredictions] = useState<PredictionResult[][]>([]);
+  const [activePredictionIndex, setActivePredictionIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      const storedPredictions = localStorage.getItem('savedAiPredictions');
+      if (storedPredictions) {
+        setSavedPredictions(JSON.parse(storedPredictions));
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải dự đoán từ localStorage", error);
+    }
+  }, []);
+
+  const handlePrediction = (newData: PredictionResult[] | null) => {
+    if (!newData) return;
+    const newPredictions = [newData, ...savedPredictions].slice(0, 5);
+    setSavedPredictions(newPredictions);
+    localStorage.setItem('savedAiPredictions', JSON.stringify(newPredictions));
+    setActivePredictionIndex(0); 
+  };
+  
+  const handleRemovePrediction = (indexToRemove: number) => {
+    const newPredictions = savedPredictions.filter((_, index) => index !== indexToRemove);
+    setSavedPredictions(newPredictions);
+    localStorage.setItem('savedAiPredictions', JSON.stringify(newPredictions));
+    if (activePredictionIndex === indexToRemove) {
+      setActivePredictionIndex(null);
+    } else if (activePredictionIndex !== null && activePredictionIndex > indexToRemove) {
+      setActivePredictionIndex(activePredictionIndex - 1);
+    }
+  };
+
   return (
-    <div className="h-screen bg-gray-100 flex">
+    // THAY ĐỔI: Thêm `relative` để các pop-up định vị đúng
+    <div className="h-screen bg-gray-100 flex relative">
       <Sidebar />
       <MainContent />
+
+      {/* --- PHẦN BỔ SUNG CHO TÍNH NĂNG AI --- */}
+      <AIColumn 
+        onPredict={handlePrediction}
+        savedPredictions={savedPredictions}
+        onSelectPrediction={setActivePredictionIndex}
+        onRemovePrediction={handleRemovePrediction}
+        activePredictionIndex={activePredictionIndex}
+      />
+      {activePredictionIndex !== null && savedPredictions[activePredictionIndex] && (
+        <SimplePredictionPopup
+          predictionData={savedPredictions[activePredictionIndex]}
+          onClose={() => handleRemovePrediction(activePredictionIndex)}
+          onMinimize={() => setActivePredictionIndex(null)}
+        />
+      )}
     </div>
   );
 };

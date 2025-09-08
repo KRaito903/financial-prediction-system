@@ -73,7 +73,7 @@ tokenizers==0.22.0
 torch==2.8.0
 tqdm==4.67.1
 transformers==4.56.0
-triton==3.4.0
+# triton==3.4.0
 typing-inspection==0.4.1
 typing_extensions==4.15.0
 urllib3==2.5.0

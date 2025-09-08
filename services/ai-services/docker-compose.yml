@@ -1,0 +1,16 @@
+# docker-compose.yml
+services:
+  ai-prediction-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4006:4006"
+    environment:
+      - DOCKER_ENV=1
+      - PYTORCH_DISABLE_MPS=1
+    volumes:
+      - ./models:/app/models
+      - ./artifacts:/app/artifacts
+      - ./data:/app/data
+    restart: unless-stopped
