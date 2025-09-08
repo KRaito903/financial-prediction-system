@@ -11,7 +11,7 @@ import Dashboard from "./components/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BacktestPage from "./route/backtest/page";
 import { Toaster } from "react-hot-toast";
-// import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
 import { apolloClient } from "./lib/apollo-client";
 import { MultiChartProvider } from './context/MultiChartContext';
 
@@ -19,7 +19,7 @@ function App() {
 	return (
 		<ApolloProvider client={apolloClient}>
 			<MultiChartProvider>
-        {/* <AuthProvider> */}
+        <AuthProvider>
   				<Router>
   					<Routes>
   						<Route path="/login" element={<Login />} />
@@ -47,7 +47,7 @@ function App() {
   					</Routes>
 					<Toaster />
   				</Router>
-			  {/* </AuthProvider> */}
+			  </AuthProvider>
       </MultiChartProvider>
 		</ApolloProvider>
 	);
