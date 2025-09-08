@@ -2,16 +2,43 @@ import { Resolvers } from "./types";
 
 export const resolvers: Resolvers = {
   Query: {
-    listUsers: (_, __, { dataSources }) => {
-      return dataSources.usersAPI.listUsers();
+    listUsers: async (_, __, { dataSources }) => {
+      return await dataSources.usersAPI.listUsers();
     },
-    login: (_, { username, password }, { dataSources }) => {
-      return dataSources.usersAPI.login(username, password);
+    login: async (_, { email, password }, { dataSources }) => {
+      return await dataSources.usersAPI.login(email, password);
     },
   },
   Mutation: {
-    signup: (_, { username, password, name, email }, { dataSources }) => {
-      return dataSources.usersAPI.signup(username, password, name, email);
+    signup: async (_, { email, password }, { dataSources }) => {
+      return await dataSources.usersAPI.signup(email, password);
+    },
+    changePassword: async (_, { input }, { dataSources }) => {
+      if (!input.userId) {
+        return {
+          success: false,
+          message: "Authentication required"
+        };
+      }
+      return await dataSources.usersAPI.changePassword(input.userId, input.newPassword);
+    },
+    changeEmail: async (_, { input }, { dataSources }) => {
+      if (!input.userId) {
+        return {
+          success: false,
+          message: "Authentication required"
+        };
+      }
+      return await dataSources.usersAPI.changeEmail(input.userId, input.newEmail);
+    },
+    deleteAccount: async (_, { input }, { dataSources }) => {
+      if (!input.userId) {
+        return {
+          success: false,
+          message: "Authentication required"
+        };
+      }
+      return await dataSources.usersAPI.deleteAccount(input.userId);
     },
   },
 };

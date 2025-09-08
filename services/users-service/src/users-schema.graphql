@@ -3,10 +3,10 @@ extend schema
 
 type User {
   id: ID!
-  username: String!
-  password: String!
-  name: String!
   email: String!
+  password: String!
+  createdAt: String!
+  updatedAt: String!
 }
 
 type AuthPayload {
@@ -17,9 +17,32 @@ type AuthPayload {
 
 type Query {
   listUsers: [User!]!
-  login(username: String!, password: String!): AuthPayload!
+  login(email: String!, password: String!): AuthPayload!
+}
+
+input ChangePasswordInput {
+  userId: ID!
+  newPassword: String!
+}
+
+input ChangeEmailInput {
+  userId: ID!
+  newEmail: String!
+}
+
+input deleteAccoutInput {
+  userId: ID!
+}
+
+type SettingsPayload {
+  success: Boolean!
+  message: String!
+  user: User
 }
 
 type Mutation {
-  signup(username: String!, password: String!, name: String!, email: String!): AuthPayload!
+  signup(email: String!, password: String!): AuthPayload!
+  changePassword(input: ChangePasswordInput!): SettingsPayload!
+  changeEmail(input: ChangeEmailInput!): SettingsPayload!
+  deleteAccount(input: deleteAccoutInput!): SettingsPayload!
 }

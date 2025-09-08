@@ -8,6 +8,7 @@ import { ApolloProvider } from "@apollo/client";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Dashboard from "./components/Dashboard";
+import Settings from "./components/Settings";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BacktestPage from "./route/backtest/page";
 import { Toaster } from "react-hot-toast";
@@ -26,18 +27,22 @@ function App() {
   						<Route path="/signup" element={<Signup />} />
   						<Route
   							path="/dashboard"
-  							element={
-								  // <ProtectedRoute>
-  									<Dashboard />
-								  // {/* </ProtectedRoute> */}
-  							}
+  							element={<Dashboard />}
   						/>
   						<Route
 							path="/backtest"
 							element={
-								// <ProtectedRoute>
+								<ProtectedRoute>
 									<BacktestPage />
-								// {/* </ProtectedRoute> */}
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/settings"
+							element={
+								<ProtectedRoute>
+									<Settings />
+								</ProtectedRoute>
 							}
 						/>
 						<Route

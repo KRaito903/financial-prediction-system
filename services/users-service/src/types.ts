@@ -24,17 +24,43 @@ export type AuthPayload = {
   user?: Maybe<User>;
 };
 
+export type ChangeEmailInput = {
+  newEmail: Scalars['String']['input'];
+  userId: Scalars['ID']['input'];
+};
+
+export type ChangePasswordInput = {
+  newPassword: Scalars['String']['input'];
+  userId: Scalars['ID']['input'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
+  changeEmail: SettingsPayload;
+  changePassword: SettingsPayload;
+  deleteAccount: SettingsPayload;
   signup: AuthPayload;
+};
+
+
+export type MutationChangeEmailArgs = {
+  input: ChangeEmailInput;
+};
+
+
+export type MutationChangePasswordArgs = {
+  input: ChangePasswordInput;
+};
+
+
+export type MutationDeleteAccountArgs = {
+  input: DeleteAccoutInput;
 };
 
 
 export type MutationSignupArgs = {
   email: Scalars['String']['input'];
-  name: Scalars['String']['input'];
   password: Scalars['String']['input'];
-  username: Scalars['String']['input'];
 };
 
 export type Query = {
@@ -45,17 +71,28 @@ export type Query = {
 
 
 export type QueryLoginArgs = {
+  email: Scalars['String']['input'];
   password: Scalars['String']['input'];
-  username: Scalars['String']['input'];
+};
+
+export type SettingsPayload = {
+  __typename?: 'SettingsPayload';
+  message: Scalars['String']['output'];
+  success: Scalars['Boolean']['output'];
+  user?: Maybe<User>;
 };
 
 export type User = {
   __typename?: 'User';
+  createdAt: Scalars['String']['output'];
   email: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  name: Scalars['String']['output'];
   password: Scalars['String']['output'];
-  username: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
+export type DeleteAccoutInput = {
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -131,22 +168,30 @@ export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs
 export type ResolversTypes = {
   AuthPayload: ResolverTypeWrapper<AuthPayload>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
+  ChangeEmailInput: ChangeEmailInput;
+  ChangePasswordInput: ChangePasswordInput;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   Mutation: ResolverTypeWrapper<{}>;
   Query: ResolverTypeWrapper<{}>;
+  SettingsPayload: ResolverTypeWrapper<SettingsPayload>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   User: ResolverTypeWrapper<User>;
+  deleteAccoutInput: DeleteAccoutInput;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = {
   AuthPayload: AuthPayload;
   Boolean: Scalars['Boolean']['output'];
+  ChangeEmailInput: ChangeEmailInput;
+  ChangePasswordInput: ChangePasswordInput;
   ID: Scalars['ID']['output'];
   Mutation: {};
   Query: {};
+  SettingsPayload: SettingsPayload;
   String: Scalars['String']['output'];
   User: User;
+  deleteAccoutInput: DeleteAccoutInput;
 };
 
 export type AuthPayloadResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['AuthPayload'] = ResolversParentTypes['AuthPayload']> = {
@@ -157,20 +202,30 @@ export type AuthPayloadResolvers<ContextType = DataSourceContext, ParentType ext
 };
 
 export type MutationResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
-  signup?: Resolver<ResolversTypes['AuthPayload'], ParentType, ContextType, RequireFields<MutationSignupArgs, 'email' | 'name' | 'password' | 'username'>>;
+  changeEmail?: Resolver<ResolversTypes['SettingsPayload'], ParentType, ContextType, RequireFields<MutationChangeEmailArgs, 'input'>>;
+  changePassword?: Resolver<ResolversTypes['SettingsPayload'], ParentType, ContextType, RequireFields<MutationChangePasswordArgs, 'input'>>;
+  deleteAccount?: Resolver<ResolversTypes['SettingsPayload'], ParentType, ContextType, RequireFields<MutationDeleteAccountArgs, 'input'>>;
+  signup?: Resolver<ResolversTypes['AuthPayload'], ParentType, ContextType, RequireFields<MutationSignupArgs, 'email' | 'password'>>;
 };
 
 export type QueryResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   listUsers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
-  login?: Resolver<ResolversTypes['AuthPayload'], ParentType, ContextType, RequireFields<QueryLoginArgs, 'password' | 'username'>>;
+  login?: Resolver<ResolversTypes['AuthPayload'], ParentType, ContextType, RequireFields<QueryLoginArgs, 'email' | 'password'>>;
+};
+
+export type SettingsPayloadResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['SettingsPayload'] = ResolversParentTypes['SettingsPayload']> = {
+  message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
 export type UserResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
+  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   password?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  username?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -178,6 +233,7 @@ export type Resolvers<ContextType = DataSourceContext> = {
   AuthPayload?: AuthPayloadResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
+  SettingsPayload?: SettingsPayloadResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
 };
 

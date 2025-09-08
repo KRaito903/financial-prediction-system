@@ -1,15 +1,15 @@
 import { gql } from "@apollo/client";
 
 export const LOGIN_QUERY = gql`
-	query Login($username: String!, $password: String!) {
-		login(username: $username, password: $password) {
+	query Login($email: String!, $password: String!) {
+		login(email: $email, password: $password) {
 			success
 			message
 			user {
 				id
-				username
-				name
 				email
+				createdAt
+				updatedAt
 			}
 		}
 	}
@@ -17,24 +17,20 @@ export const LOGIN_QUERY = gql`
 
 export const SIGNUP_MUTATION = gql`
 	mutation Signup(
-		$username: String!
-		$password: String!
-		$name: String!
 		$email: String!
+		$password: String!
 	) {
 		signup(
-			username: $username
-			password: $password
-			name: $name
 			email: $email
+			password: $password
 		) {
 			success
 			message
 			user {
 				id
-				username
-				name
 				email
+				createdAt
+				updatedAt
 			}
 		}
 	}
@@ -220,6 +216,43 @@ export const GET_NEWS = gql`
   }
 `;
 
+export const CHANGE_PASSWORD_MUTATION = gql`
+  mutation ChangePassword($input: ChangePasswordInput!) {
+    changePassword(input: $input) {
+      success
+      message
+      user {
+        id
+        email
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const CHANGE_EMAIL_MUTATION = gql`
+  mutation ChangeEmail($input: ChangeEmailInput!) {
+    changeEmail(input: $input) {
+      success
+      message
+      user {
+        id
+        email
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const DELETE_ACCOUNT_MUTATION = gql`
+  mutation DeleteAccount {
+    deleteAccount {
+      success
+      message
+    }
+    
 export const PREDICT_MODEL = gql`
   query PredictModel($datatype: String!, $modelName: String!, $predLen: Int!, $symbol: String!) {
     predictModel(
